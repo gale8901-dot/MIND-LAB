@@ -7,70 +7,78 @@
     <meta name="theme-color" content="#F5F3ED">
 
     <!-- 기본 SEO -->
-    <title>FIND YOUR WAY — 나를 이해하는 시간</title>
+    <title>MIND LAB | FIND YOUR WAY — 나를 이해하는 시간</title>
 
     <meta
         name="description"
-        content="나를 이해하고, 나다운 방향을 찾아가는 자기이해와 성장 기록 공간. 감정, 생각, 가치관, 진로를 탐색하고 나만의 성장을 기록해 보세요."
+        content="나를 이해하고 나다운 방향을 찾아가는 자기이해와 성장 기록 공간. 감정, 생각, 가치관, 진로를 탐색하고 나만의 성장을 기록해 보세요."
     >
 
-    <meta name="author" content="FIND YOUR WAY">
+    <meta name="author" content="MIND LAB">
 
-    <!-- Open Graph: 카카오톡, 페이스북 등 링크 미리보기 -->
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph: 카카오톡, SNS 링크 미리보기 -->
     <meta property="og:type" content="website">
+
+    <meta property="og:site_name" content="MIND LAB">
 
     <meta
         property="og:title"
-        content="FIND YOUR WAY — 나를 이해하는 시간"
+        content="MIND LAB | FIND YOUR WAY — 나를 이해하는 시간"
     >
 
     <meta
         property="og:description"
-        content="나를 이해하고, 나다운 방향을 찾아가는 시간. 감정과 생각을 탐색하고 나만의 성장을 기록해 보세요."
+        content="나를 이해하고 나다운 방향을 찾아가는 시간. 감정과 생각을 탐색하고 나만의 성장을 기록해 보세요."
     >
 
-    <!-- 실제 GitHub Pages 주소로 변경 -->
     <meta
         property="og:url"
-        content="https://깃허브아이디.github.io/FIND-YOUR-WAY-3/"
+        content="https://gale8901-dot.github.io/MIND-LAB/"
     >
 
-    <!-- 대표 미리보기 이미지 -->
+    <!-- 공유 대표 이미지 -->
     <meta
         property="og:image"
-        content="https://깃허브아이디.github.io/FIND-YOUR-WAY-3/og-image.png"
+        content="https://gale8901-dot.github.io/MIND-LAB/Mind-Lab_%20Find%20Your%20Way.png"
     >
 
+    <meta property="og:image:secure_url"
+        content="https://gale8901-dot.github.io/MIND-LAB/Mind-Lab_%20Find%20Your%20Way.png">
+
+    <meta property="og:image:type" content="image/png">
+
     <meta property="og:image:width" content="1200">
+
     <meta property="og:image:height" content="630">
 
     <meta
         property="og:image:alt"
-        content="FIND YOUR WAY - 나를 이해하고 나다운 방향을 찾아가는 공간"
+        content="MIND LAB - FIND YOUR WAY, 나를 이해하고 나다운 방향을 찾아가는 공간"
     >
 
-    <meta property="og:site_name" content="FIND YOUR WAY">
     <meta property="og:locale" content="ko_KR">
 
-    <!-- Twitter / X 미리보기 -->
+    <!-- X / Twitter 공유 미리보기 -->
     <meta name="twitter:card" content="summary_large_image">
 
     <meta
         name="twitter:title"
-        content="FIND YOUR WAY — 나를 이해하는 시간"
+        content="MIND LAB | FIND YOUR WAY"
     >
 
     <meta
         name="twitter:description"
-        content="나를 이해하고, 나다운 방향을 찾아가는 자기이해와 성장 기록 공간."
+        content="나를 이해하고 나다운 방향을 찾아가는 자기이해와 성장 기록 공간."
     >
 
     <meta
         name="twitter:image"
-        content="https://깃허브아이디.github.io/FIND-YOUR-WAY-3/og-image.png"
+        content="https://gale8901-dot.github.io/MIND-LAB/Mind-Lab_%20Find%20Your%20Way.png"
     >
 
-    <!-- PWA -->
+    <!-- PWA 설정 -->
     <link rel="manifest" href="./manifest.webmanifest">
 
     <link
@@ -82,68 +90,159 @@
     <!-- CSS -->
     <link rel="stylesheet" href="./styles.css">
 
-    <!-- JavaScript -->
+    <!-- JavaScript: 중복 실행 방지 -->
     <script src="./app.js" defer></script>
+
 </head>
+
 <body>
-  <div class="app-shell">
-    <aside class="sidebar" id="sidebar">
-      <a class="brand" href="#" data-page="home" aria-label="FIND YOUR WAY 홈">
-        <span class="brand-mark">F</span>
-        <span>
-          <strong>FIND YOUR WAY</strong>
-          <small>YOUR PERSONAL SPACE</small>
-        </span>
-      </a>
 
-      <div class="side-label">MY SPACE</div>
+    <div class="app-shell">
 
-      <nav class="nav-list" aria-label="주요 메뉴">
-        <button class="nav-item active" data-page="home"><span>⌂</span> 홈</button>
-        <button class="nav-item" data-page="self"><span>◎</span> 나를 탐색하기</button>
-        <button class="nav-item" data-page="emotion"><span>♡</span> 감정 이해하기</button>
-        <button class="nav-item" data-page="thought"><span>◈</span> 생각 탐색하기</button>
-        <button class="nav-item" data-page="values"><span>✧</span> 나의 가치관</button>
-        <button class="nav-item" data-page="career"><span>⌁</span> 진로 탐색</button>
-        <button class="nav-item" data-page="action"><span>↗</span> 목표와 실천</button>
-        <button class="nav-item" data-page="journal"><span>▤</span> 나의 일기</button>
-        <button class="nav-item" data-page="growth"><span>◷</span> 성장 리포트</button>
-        <button class="nav-item" data-page="future"><span>☆</span> 미래의 나</button>
-      </nav>
+        <!-- 사이드바 -->
+        <aside class="sidebar" id="sidebar">
 
-      <div class="sidebar-bottom">
-        <button class="nav-item" data-page="settings"><span>⚙</span> 설정 및 데이터</button>
-        <div class="privacy-mini">
-          <span class="privacy-dot"></span>
-          내 기기에 저장되는 개인 공간
-        </div>
-      </div>
-    </aside>
+            <a
+                class="brand"
+                href="#"
+                data-page="home"
+                aria-label="FIND YOUR WAY 홈"
+            >
+                <span class="brand-mark">F</span>
 
-    <main class="main-area">
-      <header class="topbar">
-        <button class="mobile-menu icon-button" id="menuToggle" aria-label="메뉴 열기">☰</button>
+                <span>
+                    <strong>FIND YOUR WAY</strong>
+                    <small>YOUR PERSONAL SPACE</small>
+                </span>
+            </a>
 
-        <div class="breadcrumb">
-          MY SPACE <span>/</span> <strong id="pageName">홈</strong>
-        </div>
+            <div class="side-label">MY SPACE</div>
 
-        <div class="top-actions">
-          <span class="today-label" id="todayLabel"></span>
-          <button class="avatar" data-page="settings" aria-label="설정">나</button>
-        </div>
-      </header>
+            <!-- 주요 메뉴 -->
+            <nav class="nav-list" aria-label="주요 메뉴">
 
-      <section id="app" class="page-content" aria-live="polite"></section>
+                <button class="nav-item active" data-page="home">
+                    <span>⌂</span> 홈
+                </button>
 
-      <footer class="footer-note">
-        FIND YOUR WAY <span>·</span> 나를 이해하는 일은 나만의 속도로
-      </footer>
-    </main>
-  </div>
+                <button class="nav-item" data-page="self">
+                    <span>◎</span> 나를 탐색하기
+                </button>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+                <button class="nav-item" data-page="emotion">
+                    <span>♡</span> 감정 이해하기
+                </button>
 
-  <script src="./app.js" defer></script>
+                <button class="nav-item" data-page="thought">
+                    <span>◈</span> 생각 탐색하기
+                </button>
+
+                <button class="nav-item" data-page="values">
+                    <span>✧</span> 나의 가치관
+                </button>
+
+                <button class="nav-item" data-page="career">
+                    <span>⌁</span> 진로 탐색
+                </button>
+
+                <button class="nav-item" data-page="action">
+                    <span>↗</span> 목표와 실천
+                </button>
+
+                <button class="nav-item" data-page="journal">
+                    <span>▤</span> 나의 일기
+                </button>
+
+                <button class="nav-item" data-page="growth">
+                    <span>◷</span> 성장 리포트
+                </button>
+
+                <button class="nav-item" data-page="future">
+                    <span>☆</span> 미래의 나
+                </button>
+
+            </nav>
+
+            <!-- 설정 -->
+            <div class="sidebar-bottom">
+
+                <button class="nav-item" data-page="settings">
+                    <span>⚙</span> 설정 및 데이터
+                </button>
+
+                <div class="privacy-mini">
+                    <span class="privacy-dot"></span>
+                    내 기기에 저장되는 개인 공간
+                </div>
+
+            </div>
+
+        </aside>
+
+        <!-- 메인 화면 -->
+        <main class="main-area">
+
+            <!-- 상단바 -->
+            <header class="topbar">
+
+                <button
+                    class="mobile-menu icon-button"
+                    id="menuToggle"
+                    aria-label="메뉴 열기"
+                >
+                    ☰
+                </button>
+
+                <div class="breadcrumb">
+                    MY SPACE
+                    <span>/</span>
+                    <strong id="pageName">홈</strong>
+                </div>
+
+                <div class="top-actions">
+
+                    <span
+                        class="today-label"
+                        id="todayLabel"
+                    ></span>
+
+                    <button
+                        class="avatar"
+                        data-page="settings"
+                        aria-label="설정"
+                    >
+                        나
+                    </button>
+
+                </div>
+
+            </header>
+
+            <!-- 페이지 콘텐츠 -->
+            <section
+                id="app"
+                class="page-content"
+                aria-live="polite"
+            ></section>
+
+            <!-- 하단 -->
+            <footer class="footer-note">
+                FIND YOUR WAY
+                <span>·</span>
+                나를 이해하는 일은 나만의 속도로
+            </footer>
+
+        </main>
+
+    </div>
+
+    <!-- 알림 -->
+    <div
+        class="toast"
+        id="toast"
+        role="status"
+        aria-live="polite"
+    ></div>
+
 </body>
 </html>
