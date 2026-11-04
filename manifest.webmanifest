@@ -1,0 +1,25 @@
+{
+  "name": "FIND YOUR WAY — 나를 이해하는 시간",
+  "short_name": "FIND YOUR WAY",
+  "description": "자기이해와 개인 성장 기록 공간",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f4ef",
+  "theme_color": "#f5f4ef",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
