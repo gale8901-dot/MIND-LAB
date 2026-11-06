@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="theme-color" content="#10182F">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MIND LAB">
+
+    <!-- 이 앱의 파일과 글꼴만 허용해 기록을 보호한다 -->
+    <meta
+        http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
+    >
+
+    <!-- 기본 SEO -->
+    <title>MIND LAB | 나를 찾아가는 시간</title>
+
+    <meta
+        name="description"
+        content="가장 힘든 순간에 곁이 되어 주는 곳. 우울, 불안과 공황, 공허감을 쉬운 말로 알아보고, 실제 치료와 도움받을 곳을 찾고, 내 기기에만 저장되는 기록을 남겨 보세요."
+    >
+
+    <meta name="author" content="MIND LAB">
+
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph: 카카오톡, SNS 링크 미리보기 -->
+    <meta property="og:type" content="website">
+
+    <meta property="og:site_name" content="MIND LAB">
+
+    <meta
+        property="og:title"
+        content="MIND LAB | 나를 찾아가는 시간"
+    >
+
+    <meta
+        property="og:description"
+        content="가장 힘든 순간에 곁이 되어 주는 곳. 내 마음을 알아보고, 도움받을 곳을 찾아보세요."
+    >
+
+    <meta
+        property="og:url"
+        content="https://gale8901-dot.github.io/MIND-LAB/"
+    >
+
+    <!-- 공유 대표 이미지 -->
+    <meta
+        property="og:image"
+        content="https://gale8901-dot.github.io/MIND-LAB/og-image.png"
+    >
+
+    <meta property="og:image:secure_url"
+        content="https://gale8901-dot.github.io/MIND-LAB/og-image.png">
+
+    <meta property="og:image:type" content="image/png">
+
+    <meta property="og:image:width" content="1200">
+
+    <meta property="og:image:height" content="630">
+
+    <meta
+        property="og:image:alt"
+        content="MIND LAB, 나를 이해하고 나다운 방향을 찾아가는 공간"
+    >
+
+    <meta property="og:locale" content="ko_KR">
+
+    <!-- X / Twitter 공유 미리보기 -->
+    <meta name="twitter:card" content="summary_large_image">
+
+    <meta
+        name="twitter:title"
+        content="MIND LAB | 나를 찾아가는 시간"
+    >
+
+    <meta
+        name="twitter:description"
+        content="가장 힘든 순간에 곁이 되어 주는 곳. 내 마음을 알아보고, 도움받을 곳을 찾아보세요."
+    >
+
+    <meta
+        name="twitter:image"
+        content="https://gale8901-dot.github.io/MIND-LAB/og-image.png"
+    >
+
+    <!-- PWA 설정 -->
+    <link rel="manifest" href="./manifest.webmanifest">
+
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="./styles.css">
+
+    <!-- JavaScript: 중복 실행 방지 -->
+    <script src="./sky.js" defer></script>
+    <script src="./rest.js" defer></script>
+    <script src="./guide.js" defer></script>
+    <script src="./app.js" defer></script>
+
+</head>
+
+<body>
+
+    <!-- 밤하늘 배경: 내용과 분리된 장식 요소 -->
+    <div class="sky" aria-hidden="true">
+        <canvas id="skyCanvas"></canvas>
+        <div class="sky-twinkles" id="skyTwinkles"></div>
+        <svg class="sky-horizon" viewBox="0 0 1200 200" preserveAspectRatio="none">
+            <path class="ridge-far" d="M0 120 C120 70 220 110 330 82 C450 50 540 112 680 76 C810 44 930 104 1040 72 C1110 54 1160 74 1200 62 V200 H0 Z"></path>
+            <path class="ridge-near" d="M0 160 C150 120 280 158 430 132 C590 104 720 160 880 128 C1000 106 1100 140 1200 118 V200 H0 Z"></path>
+        </svg>
+    </div>
+
+    <div class="app-shell">
+
+        <!-- 사이드바 -->
+        <aside class="sidebar" id="sidebar">
+
+            <a
+                class="brand"
+                href="#"
+                data-page="home"
+                aria-label="MIND LAB 홈"
+            >
+                <span class="brand-mark"><svg viewBox="0 0 44 44" aria-hidden="true"><ellipse cx="22" cy="22" rx="18" ry="9" transform="rotate(-38 22 22)" fill="none" stroke-width="1.1"></ellipse><path d="M33 4.5l1.3 3.4 3.4 1.3-3.4 1.3L33 14l-1.3-3.5-3.4-1.3 3.4-1.3zM9 29l1.3 3.4 3.4 1.3-3.4 1.3L9 38.500l-1.300-3.500-3.400-1.300 3.400-1.300z" stroke="none"></path></svg></span>
+
+                <span>
+                    <strong>MIND LAB</strong>
+                    <small>Understand yourself.</small>
+                </span>
+            </a>
+
+            <!-- 주요 메뉴 -->
+            <nav class="nav-list" aria-label="주요 메뉴">
+
+                <button class="nav-item calm-entry" data-page="calm">
+                    <span>☀</span> 지금 힘들어요
+                </button>
+
+                <button class="nav-item active" data-page="home">
+                    <span>⌂</span> 홈
+                </button>
+
+                <div class="side-label">마음 안내</div>
+
+                <button class="nav-item" data-page="understand">
+                    <span>◐</span> 마음 알아보기
+                </button>
+
+                <button class="nav-item" data-page="care">
+                    <span>✚</span> 어떤 치료가 있나요
+                </button>
+
+                <button class="nav-item" data-page="help">
+                    <span>☎</span> 도움받는 법
+                </button>
+
+                <button class="nav-item" data-page="allies">
+                    <span>♥</span> 곁에 있는 사람에게
+                </button>
+
+                <div class="side-label">나의 공간</div>
+
+                <button class="nav-item" data-page="know">
+                    <span>✦</span> 나를 알아가기
+                </button>
+
+                <button class="nav-item" data-page="self">
+                    <span>◎</span> 나를 탐색하기
+                </button>
+
+                <button class="nav-item" data-page="emotion">
+                    <span>♡</span> 감정 이해하기
+                </button>
+
+                <button class="nav-item" data-page="thought">
+                    <span>◈</span> 생각 탐색하기
+                </button>
+
+                <button class="nav-item" data-page="values">
+                    <span>✧</span> 나의 가치관
+                </button>
+
+                <button class="nav-item" data-page="career">
+                    <span>⌁</span> 진로 탐색
+                </button>
+
+                <button class="nav-item" data-page="action">
+                    <span>↗</span> 목표와 실천
+                </button>
+
+                <button class="nav-item" data-page="journal">
+                    <span>▤</span> 나의 일기
+                </button>
+
+                <button class="nav-item" data-page="growth">
+                    <span>◷</span> 성장 리포트
+                </button>
+
+                <button class="nav-item" data-page="future">
+                    <span>✉</span> 나에게 보내는 편지
+                </button>
+
+            </nav>
+
+            <!-- 설정 -->
+            <div class="sidebar-bottom">
+
+                <button class="nav-item" data-page="about">
+                    <span>ⓘ</span> 이 사이트에 대해
+                </button>
+
+                <button class="nav-item" data-page="settings">
+                    <span>⚙</span> 설정 및 데이터
+                </button>
+
+                <div class="privacy-mini">
+                    <span class="privacy-dot"></span>
+                    내 기기에 저장되는 개인 공간
+                </div>
+
+            </div>
+
+        </aside>
+
+        <!-- 메인 화면 -->
+        <main class="main-area">
+
+            <!-- 상단바 -->
+            <header class="topbar">
+
+                <a class="top-brand" href="#" data-page="home" aria-label="MIND LAB 홈">
+                    <span class="brand-mark"><svg viewBox="0 0 44 44" aria-hidden="true"><ellipse cx="22" cy="22" rx="18" ry="9" transform="rotate(-38 22 22)" fill="none" stroke-width="1.1"></ellipse><path d="M33 4.5l1.3 3.4 3.4 1.3-3.4 1.3L33 14l-1.3-3.5-3.4-1.3 3.4-1.3zM9 29l1.3 3.4 3.4 1.3-3.4 1.3L9 38.500l-1.300-3.500-3.400-1.300 3.400-1.300z" stroke="none"></path></svg></span>
+                    <span>
+                        <strong>MIND LAB</strong>
+                        <small>Understand yourself.</small>
+                    </span>
+                </a>
+
+                <div class="breadcrumb">
+                    MIND LAB
+                    <span>/</span>
+                    <strong id="pageName">홈</strong>
+                </div>
+
+                <div class="top-actions">
+
+                    <button class="calm-top" data-page="calm" type="button">
+                        지금 힘들어요
+                    </button>
+
+                    <span
+                        class="today-label"
+                        id="todayLabel"
+                    ></span>
+
+                    <button
+                        class="avatar"
+                        data-page="settings"
+                        aria-label="설정"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.500" r="4"></circle><path d="M4.500 20.500c1.200-4.200 4-6 7.500-6s6.300 1.800 7.500 6"></path></svg>
+                    </button>
+
+                </div>
+
+            </header>
+
+            <!-- 페이지 콘텐츠 -->
+            <section
+                id="app"
+                class="page-content"
+                aria-live="polite"
+            ></section>
+
+            <!-- 하단 -->
+            <footer class="footer-note">
+                Understand yourself. Be gentle with yourself.
+            </footer>
+
+        </main>
+
+        <!-- 하단 메뉴 (휴대폰, 태블릿) -->
+        <nav class="bottom-nav" aria-label="하단 메뉴">
+            <button class="bottom-item" data-page="home" data-group="home" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"></path></svg>
+                홈
+            </button>
+            <button class="bottom-item" data-page="record" data-group="record" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-7M12 20V5M19 20v-10"></path></svg>
+                기록
+            </button>
+            <button class="bottom-item" data-page="growth" data-group="growth" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.500l2.600 5.500 6 .8-4.400 4.100 1.200 6L12 17l-5.400 2.900 1.200-6-4.400-4.100 6-.8z"></path></svg>
+                성장
+            </button>
+            <button class="bottom-item" data-page="explore" data-group="explore" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.500"></circle><path d="M6.800 14.300C3.800 16.800 2.400 18.800 3 19.700c1 1.500 6-.5 11-4.500s8-8.500 7-10c-.6-.9-3-.5-6 .9"></path></svg>
+                탐험
+            </button>
+            <button class="bottom-item" data-page="settings" data-group="settings" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100"></path></svg>
+                설정
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- 알림 -->
+    <div
+        class="toast"
+        id="toast"
+        role="status"
+        aria-live="polite"
+    ></div>
+
+</body>
+</html>
