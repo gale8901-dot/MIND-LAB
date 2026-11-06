@@ -9,6 +9,18 @@
   "background_color": "#10182f",
   "theme_color": "#10182f",
   "lang": "ko",
+  "shortcuts": [
+    {
+      "name": "지금 힘들어요",
+      "short_name": "지금 힘들어요",
+      "url": "./#calm"
+    },
+    {
+      "name": "도움받는 법",
+      "short_name": "도움받는 법",
+      "url": "./#help"
+    }
+  ],
   "icons": [
     {
       "src": "./icon.svg",

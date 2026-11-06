@@ -16,12 +16,14 @@
     >
 
     <!-- 기본 SEO -->
-    <title>MIND LAB | 나를 찾아가는 시간</title>
+    <title>MIND LAB | 혼자 힘들 때 곁이 되어 주는 곳</title>
 
     <meta
         name="description"
-        content="가장 힘든 순간에 곁이 되어 주는 곳. 우울, 불안과 공황, 공허감을 쉬운 말로 알아보고, 실제 치료와 도움받을 곳을 찾고, 내 기기에만 저장되는 기록을 남겨 보세요."
+        content="혼자 힘들 때 가입 없이 바로 열어 보는 무료 공간. 우울, 불안과 공황, 공허감을 쉬운 말로 알아보고, 상담 전화와 문자, 치료와 도움받을 곳을 찾고, 내 기기에만 저장되는 기록을 남겨 보세요."
     >
+
+    <link rel="canonical" href="https://gale8901-dot.github.io/MIND-LAB/">
 
     <meta name="author" content="MIND LAB">
 
@@ -64,7 +66,7 @@
 
     <meta
         property="og:image:alt"
-        content="MIND LAB, 나를 이해하고 나다운 방향을 찾아가는 공간"
+        content="MIND LAB, 가장 힘든 순간에 곁이 되어 주는 곳"
     >
 
     <meta property="og:locale" content="ko_KR">
@@ -105,6 +107,21 @@
 </head>
 
 <body>
+
+    <!-- 스크립트가 돌지 않는 환경과 검색 엔진에도 가장 중요한 안내를 보여 준다 -->
+    <noscript>
+        <div style="padding:24px;color:#f5f3fa;background:#10182f">
+            <h1>MIND LAB, 혼자 힘들 때 곁이 되어 주는 곳</h1>
+            <p>지금 많이 힘들다면 혼자 견디지 않아도 괜찮아요.</p>
+            <ul>
+                <li>자살예방 상담 (24시간): 전화 <a style="color:#f6e5bd" href="tel:109">109</a>, <a style="color:#f6e5bd" href="sms:109">문자 109</a></li>
+                <li>정신건강 위기상담 (24시간): <a style="color:#f6e5bd" href="tel:15770199">1577-0199</a></li>
+                <li>카카오톡 자살예방 상담 마들랜 (24시간)</li>
+                <li>청소년상담 (24시간, 9~24세): 문자 <a style="color:#f6e5bd" href="sms:1388">1388</a>, 휴대폰 전화는 지역번호+1388</li>
+            </ul>
+            <p>당장 위험하다면 112 또는 119에 연락하세요. 이 사이트의 다른 기능은 JavaScript를 켜야 사용할 수 있어요.</p>
+        </div>
+    </noscript>
 
     <!-- 밤하늘 배경: 내용과 분리된 장식 요소 -->
     <div class="sky" aria-hidden="true">
@@ -158,6 +175,14 @@
 
                 <button class="nav-item" data-page="help">
                     <span>☎</span> 도움받는 법
+                </button>
+
+                <button class="nav-item" data-page="safety">
+                    <span>☂</span> 내 안전 계획
+                </button>
+
+                <button class="nav-item" data-page="reach">
+                    <span>❝</span> 말 꺼내는 법
                 </button>
 
                 <button class="nav-item" data-page="allies">
@@ -275,12 +300,13 @@
             <section
                 id="app"
                 class="page-content"
-                aria-live="polite"
+                tabindex="-1"
             ></section>
 
             <!-- 하단 -->
             <footer class="footer-note">
-                Understand yourself. Be gentle with yourself.
+                Understand yourself. Be gentle with yourself.<br>
+                진단이나 치료를 대신하지 않아요. 안내 내용은 아직 전문가 검수 전이에요.
             </footer>
 
         </main>

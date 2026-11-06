@@ -24,8 +24,23 @@ const SOURCES = {
   amcColumn: ["서울아산병원: 치료 사실이 알려질까요", "https://www.amc.seoul.kr/asan/depts/mind/K/bbsDetail.do?menuId=4548&contentId=259513"],
   voucher: ["보건복지부: 2026년 심리상담 바우처 지침", "https://www.mohw.go.kr/board.es?mid=a10409020000&bid=0026&list_no=1488771&act=view"],
   voucherLocal: ["하남시 보건소: 심리상담 바우처 안내", "https://www.hanam.go.kr/health/contents.do?key=13057"],
-  voucherSeoul: ["서울특별시: 심리상담 지원사업 안내", "https://news.seoul.go.kr/welfare/archives/562723"]
+  voucherSeoul: ["서울특별시: 심리상담 지원사업 안내", "https://news.seoul.go.kr/welfare/archives/562723"],
+  line1577Seoul: ["서울특별시: 정신건강 위기상담 전화 1577-0199", "https://news.seoul.go.kr/welfare/archives/561837"],
+  teen1388: ["복지로: 청소년상담 1388", "https://www.bokjiro.go.kr/ssis-tbu/cms/pc/news/promotion/1307645_1118.html"],
+  madeullan: ["연제구정신건강복지센터: 자살예방 SNS 상담 마들랜 안내", "https://ymhc.or.kr/sub.php?id=notice&mode=view&menukey=17&idx=437&page=1"],
+  prevalence: ["e-나라지표: 성인 정신장애 평생 유병률", "https://www.index.go.kr/unity/potal/main/EachDtlPageDetail.do?idx_cd=1441"],
+  attitude2024: ["보건복지부: 2024년 국민 정신건강 지식 및 태도 조사", "https://www.mohw.go.kr/board.es?mid=a10503010100&bid=0027&act=view&list_no=1482175&nPage=1"],
+  safetyStudy: ["JAMA Psychiatry 2018: 안전 계획과 후속 연락 연구", "https://doi.org/10.1001/jamapsychiatry.2018.1776"],
+  safetyPlan: ["Stanley-Brown Safety Plan", "https://suicidesafetyplan.com/"]
 };
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+}[c]));
 
 const source = (...keys) => `
   <p class="guide-source">출처: ${keys.map(k => `
@@ -49,12 +64,281 @@ const notMedical = `
 
 const crisisLines = `
   <ul class="crisis-lines">
-    <li><span>자살예방 상담전화 (24시간)</span><a href="tel:109">109</a></li>
-    <li><span>정신건강 위기상담 (24시간)</span><a href="tel:15770199">1577-0199</a></li>
-    <li><span>청소년전화</span><a href="tel:1388">1388</a></li>
+    <li>
+      <span>자살예방 상담 (24시간)</span>
+      <span class="line-actions"><a href="tel:109">전화 109</a><a href="sms:109">문자</a></span>
+    </li>
+    <li>
+      <span>정신건강 위기상담 (24시간)</span>
+      <span class="line-actions"><a href="tel:15770199">1577-0199</a></span>
+    </li>
+    <li>
+      <span>청소년상담 (24시간, 9~24세)<small>휴대폰으로 걸 때는 지역번호를 붙여요. 예: 서울 02-1388</small></span>
+      <span class="line-actions"><a href="tel:021388">전화 02-1388</a><a href="sms:1388">문자</a></span>
+    </li>
   </ul>
-  <p>당장 위험하다면 112 또는 119에 연락하세요.</p>
+  <p>말하기 어렵다면 문자나 카카오톡 <strong>마들랜</strong>(24시간)으로 시작해도 돼요. 당장 위험하다면 112 또는 119에 연락하세요.</p>
 `;
+
+// 지금 힘든 사람이 자기 상태를 고르면 바로 할 일만 보여 준다.
+const CALM_CHOICES = [
+  ["die", "죽고 싶은 생각이 들어요"],
+  ["panic", "숨이 막히고 무서워요"],
+  ["empty", "아무것도 느껴지지 않아요"],
+  ["nobody", "말할 사람이 없어요"]
+];
+
+function calmReply(id, hasPlan) {
+  const planButton = `<button class="btn secondary" data-go="safety" type="button">${hasPlan ? "내 안전 계획 열기" : "내 안전 계획 만들기"}</button>`;
+
+  const replies = {
+    die: `
+      <p class="hand">말해 줘서 고마워요.</p>
+      <p>그런 생각이 든다고 해서 당신이 이상하거나 나쁜 사람인 건 아니에요. 혼자 버티지 않아도 돼요. 그대로 말해도 괜찮아요.</p>
+      <div class="button-row">
+        <a class="btn" href="tel:109">109에 전화하기</a>
+        <a class="btn secondary" href="sms:109">109에 문자하기</a>
+        ${planButton}
+      </div>
+      <p class="reply-note"><strong>이미 몸을 다쳤거나 곧 해칠 것 같다면 지금 119에 연락해 주세요.</strong> 할 수 있다면 위험한 물건에서 떨어지고, 다른 사람 곁으로 가 주세요.</p>
+    `,
+    panic: `
+      <p class="hand">지금 정말 무섭죠. 대개 지나가요.</p>
+      ${list([
+        "할 수 있다면 그 자리에 머물러요.",
+        "천천히, 깊게 숨을 쉬어요.",
+        "지나갈 거라고 스스로에게 말해 줘요."
+      ])}
+      <div class="button-row">
+        <button class="btn" data-scroll="restCard" type="button">함께 숨 고르기</button>
+      </div>
+      <p class="reply-note"><strong>처음 겪는 증상이거나, 가슴 통증이나 호흡곤란이 심해 걱정되면 119에 연락하세요.</strong> 다른 원인일 수도 있어요.</p>
+      ${source("nhsPanic")}
+    `,
+    empty: `
+      <p class="hand">설명하지 못해도 괜찮아요.</p>
+      <p>느껴지지 않는 것도 힘든 일이에요. 지금 뭔가 느껴 보려고 애쓰지 않아도 돼요. 원한다면 하나만 골라 보세요.</p>
+      ${list([
+        "물 한 컵 마시기",
+        "창문을 열거나 잠깐 밖의 공기 쐬기",
+        "누군가에게 \"나 요즘 좀 힘들어\" 한 줄 보내기"
+      ])}
+      <div class="button-row">
+        <button class="btn secondary" data-go="reach" type="button">보낼 말 골라 보기</button>
+        <button class="btn ghost" data-go="understand" type="button">공허감에 대해 읽어 보기</button>
+      </div>
+      <p class="reply-note">오래가거나 나를 해치고 싶은 마음으로 이어진다면 혼자 안고 있지 말아 주세요. 위에 있는 109는 24시간 열려 있어요.</p>
+    `,
+    nobody: `
+      <p class="hand">아는 사람이 아니어도 돼요.</p>
+      <p>모르는 사람이라서 오히려 편하게 말할 수 있을 때도 있어요. 잘 설명하지 못해도 괜찮아요.</p>
+      ${list([
+        "<strong>문자:</strong> 109로 문자를 보내면 상담원과 연결돼요.",
+        "<strong>카카오톡:</strong> 돋보기를 눌러 '마들랜'을 검색한 뒤 말풍선을 눌러요. 365일 24시간이에요.",
+        "<strong>앱:</strong> 앱 마켓에서 '마들랜'을 내려받아 가입한 뒤 이용해요."
+      ])}
+      <div class="button-row">
+        <a class="btn" href="sms:109">109에 문자하기</a>
+        <button class="btn secondary" data-go="reach" type="button">첫마디 골라 보기</button>
+      </div>
+      ${source("madeullan")}
+    `
+  };
+
+  return replies[id] ? `<div class="calm-reply">${replies[id]}</div>` : "";
+}
+
+// 내 안전 계획: Stanley-Brown 안전 계획의 순서를 참고해 쉬운 말로 다시 썼다.
+const SAFETY_STEPS = [
+  ["signs", "힘들어지기 시작한다는 신호", "어떤 생각, 기분, 상황이 오면 위험해지기 시작하나요?", "예: 잠을 며칠 못 잤을 때, 다 끝났다는 생각이 들 때"],
+  ["alone", "혼자서도 할 수 있는 일", "다른 사람 없이도 마음을 잠깐 돌릴 수 있는 일이에요.", "예: 샤워하기, 산책, 좋아하는 노래 듣기"],
+  ["places", "마음을 돌릴 수 있는 사람과 장소", "힘들다고 말하지 않아도 돼요. 그냥 같이 있을 수 있으면 돼요.", "예: 동네 카페, 친구 ○○와 게임하기"],
+  ["people", "힘들다고 말할 수 있는 사람과 연락처", "한 사람이면 충분해요. 떠오르지 않으면 비워 둬도 돼요.", "예: 언니 010-0000-0000"],
+  ["pros", "연락할 전문가와 기관", "109와 1577-0199는 아래에 늘 적혀 있어요. 다니는 병원이나 상담 선생님이 있다면 적어 주세요.", "예: ○○정신건강의학과 02-000-0000"],
+  ["safe", "주변을 더 안전하게 만드는 방법", "위험해질 수 있는 것과 거리를 두는 방법이에요. 혼자 어렵다면 믿는 사람이나 상담자에게 부탁해도 돼요.", "예: 힘든 날에는 혼자 있지 않기, 믿는 사람에게 맡겨 두기"],
+  ["reason", "그래도 나를 붙잡아 주는 것 (선택)", "작아도 괜찮아요. 지금 떠오르지 않으면 비워 둬도 돼요.", "예: 우리 집 고양이, 다음 주에 보기로 한 영화"]
+];
+
+function safetyText(plan) {
+  const lines = SAFETY_STEPS
+    .filter(([key]) => String(plan[key] || "").trim())
+    .map(([key, title]) => `${title}\n${String(plan[key]).trim()}`);
+
+  return [
+    "내 안전 계획",
+    ...lines,
+    "자살예방 상담 109 (전화, 문자 24시간)\n정신건강 위기상담 1577-0199 (24시간)\n당장 위험하면 119 또는 112"
+  ].join("\n\n");
+}
+
+function safety(data) {
+  const plan = data.safetyPlan || {};
+  const filled = SAFETY_STEPS.filter(([key]) => String(plan[key] || "").trim());
+
+  return `
+    ${head(
+      "내 안전 계획",
+      "견디기 어려운 순간에는 무엇을 해야 할지 떠올리기 어려워요. 조금 괜찮을 때 미리 적어 두는 나만의 짧은 메모예요."
+    )}
+
+    ${filled.length ? `
+      <section class="crisis-card" id="safetyView">
+        <p><strong>힘들어지면 위에서부터 차례로 해 보세요. 언제든 건너뛰고 바로 전화해도 돼요.</strong></p>
+        <ol class="plan-list">
+          ${filled.map(([key, title]) => `
+            <li><strong>${title}</strong><span>${esc(plan[key])}</span></li>
+          `).join("")}
+        </ol>
+        ${crisisLines}
+        <div class="button-row">
+          <button class="btn secondary small" id="copySafety" type="button">계획 복사하기</button>
+        </div>
+        <p class="muted small-text plan-tip">화면을 사진으로 찍어 두거나, 믿는 사람이나 상담 선생님과 나눠도 좋아요.</p>
+      </section>
+    ` : `
+      <div class="notice">
+        <strong>지금 많이 위험하다면 적지 않아도 돼요.</strong> 먼저 <a class="tel-link" href="tel:109">109에 전화</a>하거나 <a class="tel-link" href="sms:109">문자</a>를 보내 주세요. 다 채우지 않아도 괜찮아요.
+      </div>
+    `}
+
+    <section class="card guide-section">
+      <div class="form-actions">
+        <h2 class="guide-h2">${filled.length ? "계획 고치기" : "하나씩 적어 보기"}</h2>
+        <span class="save-status" id="safetyStatus">쓰는 대로 내 기기에 저장돼요</span>
+      </div>
+      <form id="safetyForm">
+        ${SAFETY_STEPS.map(([key, title, hint, placeholder], i) => `
+          <div class="field">
+            <label for="plan-${key}">${i + 1}. ${title}</label>
+            <span class="hint">${hint}</span>
+            <textarea id="plan-${key}" name="${key}" placeholder="${placeholder}">${esc(plan[key] || "")}</textarea>
+          </div>
+        `).join("")}
+        <button class="btn" type="submit">계획 저장하기</button>
+      </form>
+    </section>
+
+    <section class="card guide-section">
+      <h2 class="guide-h2">이 계획에 대해</h2>
+      <p>자살 위기를 다루는 Stanley-Brown 안전 계획의 순서를 참고해 쉬운 말로 옮겼어요. 응급실 환자를 비교한 2018년 연구에서는 전문가와 안전 계획을 세우고 후속 전화를 받은 사람들의 6개월 내 자살 행동이 더 적었어요(3.03%, 일반 진료 5.29%).</p>
+      <div class="notice">
+        그 연구는 전문가와 함께한 경우이고, 이 앱으로 혼자 만든 계획을 시험한 것은 아니에요. 가능하다면 상담자나 의사와 함께 살펴봐 주세요. 이 계획이 전문가의 도움을 대신하지는 않아요.
+      </div>
+      ${source("safetyPlan", "safetyStudy")}
+    </section>
+  `;
+}
+
+const FIRST_WORDS = [
+  ["가까운 사람에게", "요즘 많이 힘들어. 해결해 주지 않아도 되는데, 그냥 조금 들어 줄 수 있어?"],
+  ["자세히 말하기 어려울 때", "요즘 내가 좀 안 좋아. 자세히는 아직 말 못 하겠는데, 네가 알고 있어 줬으면 해서."],
+  ["같이 가 달라고 할 때", "병원이나 상담을 한번 가 보려고 하는데 혼자는 좀 무서워. 같이 가 줄 수 있어?"],
+  ["죽고 싶은 생각까지 들 때", "요즘 죽고 싶다는 생각까지 들어. 무슨 일을 하겠다는 말은 아니어도, 혼자 들고 있기가 너무 힘들어."],
+  ["상담 전화나 문자에", "어디서부터 말해야 할지 모르겠어요. 요즘 너무 힘들어서 연락했어요."],
+  ["병원 예약 전화에", "처음 진료를 받고 싶어서요. 요즘 잠을 잘 못 자고 마음이 많이 힘들어요. 예약하려면 어떻게 하면 될까요?"]
+];
+
+const CLINIC_FIELDS = [
+  ["since", "언제부터 힘들었나요?", "예: 올봄부터, 석 달쯤"],
+  ["worst", "가장 힘든 것은 무엇인가요?", "예: 아침에 일어나기가 어렵고 이유 없이 눈물이 나요"],
+  ["body", "잠, 식사, 몸은 어떤가요?", "예: 새벽 4시까지 잠을 못 자요. 입맛이 없어요"],
+  ["life", "일상에서 달라진 것이 있나요?", "예: 회사를 자주 빠져요. 사람을 안 만나요"],
+  ["thoughts", "죽고 싶은 생각이나 나를 해치고 싶은 마음이 있나요?", "말로 꺼내기 어려우면 여기에 적어 보여 줘도 돼요"],
+  ["meds", "먹는 약이나 다니는 병원이 있나요?", "예: 없음, 또는 약 이름"],
+  ["ask", "묻고 싶은 것이 있나요?", "예: 약을 꼭 먹어야 하나요? 얼마나 다녀야 하나요?"]
+];
+
+function clinicText(note) {
+  const lines = CLINIC_FIELDS
+    .filter(([key]) => String(note[key] || "").trim())
+    .map(([key, title]) => `${title}\n${String(note[key]).trim()}`);
+
+  return lines.length ? ["진료 메모", ...lines].join("\n\n") : "";
+}
+
+function reach(data) {
+  const note = data.clinicNote || {};
+
+  return `
+    ${head(
+      "말 꺼내는 법",
+      "첫마디가 가장 어려워요. 잘 설명하지 않아도 되고, 아래 문장을 그대로 보내도 돼요."
+    )}
+
+    <section class="guide-section">
+      <h2 class="guide-h2">그대로 보내도 되는 첫마디</h2>
+      <div class="grid grid-2">
+        ${FIRST_WORDS.map(([title, text]) => `
+          <article class="card word-card">
+            <h3 class="guide-h3">${title}</h3>
+            <p>${text}</p>
+            <button class="btn secondary small" data-copy-text="${esc(text)}" type="button">복사하기</button>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+
+    <section class="card guide-section">
+      <h2 class="guide-h2">기대와 다른 대답이 돌아오면</h2>
+      <p>말을 꺼내기까지 정말 많은 힘이 들었을 거예요. 가까운 사람도 어떻게 답할지 몰라서 서툴게 말할 수 있어요. 그 한 사람의 대답이 당신의 힘듦을 정하지는 않아요. 다른 사람이나 <a class="tel-link" href="sms:109">109 문자</a>, 카카오톡 마들랜에 다시 말해도 괜찮아요.</p>
+      <div class="button-row">
+        <button class="btn ghost small" data-go="allies" type="button">곁에 있는 사람에게 이 안내 보여 주기</button>
+      </div>
+    </section>
+
+    <section class="card guide-section">
+      <div class="form-actions">
+        <h2 class="guide-h2">병원이나 상담에 가져갈 메모</h2>
+        <span class="save-status" id="clinicStatus">쓰는 대로 내 기기에 저장돼요</span>
+      </div>
+      <p>막상 앞에 앉으면 말이 안 나올 수 있어요. 적을 수 있는 것만 적어서 화면을 그대로 보여 줘도 돼요.</p>
+      <form id="clinicForm">
+        ${CLINIC_FIELDS.map(([key, title, placeholder]) => `
+          <div class="field">
+            <label for="note-${key}">${title}</label>
+            <textarea id="note-${key}" name="${key}" placeholder="${placeholder}">${esc(note[key] || "")}</textarea>
+          </div>
+        `).join("")}
+      </form>
+      <h3 class="guide-h3">보여 줄 메모</h3>
+      <div class="clinic-preview" id="clinicPreview">${esc(clinicText(note)) || "적으면 여기에 한 장으로 모여요."}</div>
+      <div class="button-row">
+        <button class="btn secondary small" id="copyClinic" type="button">메모 복사하기</button>
+        <button class="btn ghost small" data-go="help" type="button">어디로 가면 되나요</button>
+      </div>
+    </section>
+  `;
+}
+
+function supportCard() {
+  return `
+    <section class="crisis-card support-card" id="supportCard" tabindex="-1">
+      <p><strong>방금 쓴 글에 무거운 말이 있었어요.</strong></p>
+      <p>글은 저장만 됐고 아무에게도 가지 않았어요. 혹시 지금 많이 힘들다면, 혼자 들고 있지 않아도 돼요.</p>
+      <div class="button-row">
+        <a class="btn" href="tel:109">109에 전화하기</a>
+        <a class="btn secondary" href="sms:109">109에 문자하기</a>
+        <button class="btn secondary" data-go="safety" type="button">내 안전 계획</button>
+        <button class="btn ghost" id="supportClose" type="button">괜찮아요, 닫기</button>
+      </div>
+    </section>
+  `;
+}
+
+function keepSafe() {
+  return `
+    <section class="card guide-section" id="keepSafe">
+      <h2 class="guide-h2">기록을 오래 지키려면</h2>
+      <p>기록은 이 브라우저에만 있어서 기기를 바꾸거나 사이트 데이터를 지우면 사라져요. 특히 iPhone의 Safari는 한동안 쓰지 않은 사이트의 데이터를 지울 수 있어요.</p>
+      ${list([
+        "<strong>iPhone:</strong> Safari의 공유 버튼에서 '홈 화면에 추가'",
+        "<strong>Android:</strong> Chrome 메뉴에서 '앱 설치' 또는 '홈 화면에 추가'",
+        "<strong>가끔 백업:</strong> 아래 '데이터 백업하기'로 파일을 만들어 안전한 곳에 두세요. 파일은 암호화되지 않아요."
+      ])}
+      <button class="btn secondary hidden" id="installApp" type="button">이 기기에 앱으로 추가하기</button>
+    </section>
+  `;
+}
 
 const sayings = [
   "울고 싶으면 울어도 돼요. 그만큼 많이 참았다는 거니까요.",
@@ -65,17 +349,36 @@ const sayings = [
   "원래 그런 인생은 없어요. 사는 방법은 정말 다양해요."
 ];
 
-function calm() {
+function calm(data) {
+  const hasPlan = Object.values(data?.safetyPlan || {}).some(x => String(x).trim());
+
   return `
     <div class="calm">
       <p class="calm-permission">아무것도 하지 않아도 돼요. 여기 잠시 있어도 돼요.</p>
+      <div class="calm-quick">
+        <a class="btn" href="tel:109">109 전화</a>
+        <a class="btn secondary" href="sms:109">109 문자</a>
+        ${hasPlan ? `<button class="btn secondary" data-go="safety" type="button">내 안전 계획</button>` : ""}
+      </div>
       <p class="calm-saying" id="calmSaying" aria-live="polite">${sayings[0]}</p>
       <button class="btn secondary" id="nextSaying" type="button">다른 말 듣기</button>
     </div>
 
+    <section class="card calm-choose">
+      <h2 class="guide-h2">지금 어떤 쪽에 가까운가요?</h2>
+      <p class="muted small-text">고르지 않아도 돼요. 무엇을 골랐는지 저장되지 않아요.</p>
+      <div class="choice-list">
+        ${CALM_CHOICES.map(([id, label]) => `
+          <button class="choice-button" data-calm="${id}" aria-pressed="false" type="button">${label}</button>
+        `).join("")}
+      </div>
+      <div id="calmReply" aria-live="polite"></div>
+    </section>
+
     <section class="crisis-card">
-      <p><strong>혼자 견디기 어렵다면, 지금 전화해도 괜찮아요.</strong></p>
+      <p><strong>혼자 견디기 어렵다면, 지금 연락해도 괜찮아요.</strong></p>
       ${crisisLines}
+      ${source("line109", "line1577Seoul", "teen1388", "madeullan")}
     </section>
 
     <section class="rest-card" id="restCard">
@@ -131,6 +434,8 @@ function calm() {
         <h2 class="guide-h2">조금 더 필요하다면</h2>
         <div class="button-column">
           <button class="btn ghost" data-go="understand" type="button">공황이 왔을 때 알아두면 좋은 것</button>
+          <button class="btn ghost" data-go="reach" type="button">누군가에게 말 꺼내 보기</button>
+          <button class="btn ghost" data-go="safety" type="button">내 안전 계획 만들기</button>
           <button class="btn ghost" data-go="help" type="button">어디에 도움을 요청할 수 있나요</button>
         </div>
       </section>
@@ -145,6 +450,16 @@ function understand() {
       "우울, 불안과 공황, 공허감은 약하거나 게을러서 생기는 일이 아니에요. 원인도 모습도 사람마다 달라요."
     )}
     ${notMedical}
+
+    <section class="card guide-section not-alone">
+      <h2 class="guide-h2">당신만 이런 게 아니에요</h2>
+      ${list([
+        "한국 성인의 <strong>27.8%</strong>, 4명 중 1명 넘게 평생 한 번 이상 정신장애를 겪어요. (2021년 조사, 만 18~79세. 우울장애, 불안장애, 알코올과 니코틴 사용장애 포함)",
+        "2024년 조사에서 15~69세 응답자의 <strong>73.6%</strong>가 지난 1년 동안 정신건강 문제를 경험했다고 답했어요. 모두 병을 진단받았다는 뜻은 아니에요."
+      ])}
+      <p>말하지 않아서 보이지 않을 뿐, 많은 사람이 비슷한 시간을 지나고 있어요.</p>
+      ${source("prevalence", "attitude2024")}
+    </section>
 
     <section class="card guide-section" id="depression">
       <h2 class="guide-h2">우울</h2>
@@ -270,7 +585,21 @@ function help() {
     <section class="crisis-card">
       <p><strong>지금 위험하거나 혼자 있기 어렵다면</strong></p>
       ${crisisLines}
-      ${source("line109", "line1577")}
+      ${source("line109", "line1577", "line1577Seoul", "teen1388")}
+    </section>
+
+    <section class="card guide-section">
+      <h2 class="guide-h2">전화가 어렵다면</h2>
+      <p>목소리를 내기 힘들어도 괜찮아요. 글로 시작할 수 있어요.</p>
+      ${list([
+        "<strong>마들랜(자살예방 SNS 상담, 365일 24시간):</strong> 카카오톡에서 돋보기를 눌러 '마들랜'을 검색해 말풍선을 누르거나, 앱을 내려받아 가입한 뒤 이용해요. 109로 문자를 보내도 상담원과 연결돼요.",
+        "<strong>청소년상담 1388(9~24세, 365일 24시간):</strong> 1388로 문자를 보내거나, 카카오톡에서 '청소년상담1388' 채널을 추가해 고민을 보내요."
+      ])}
+      <div class="button-row">
+        <a class="btn secondary" href="sms:109">109에 문자하기</a>
+        <button class="btn ghost" data-go="reach" type="button">첫마디 골라 보기</button>
+      </div>
+      ${source("madeullan", "teen1388")}
     </section>
 
     <section class="grid grid-2 guide-section">
@@ -278,6 +607,7 @@ function help() {
         <h2 class="guide-h2">정신건강의학과</h2>
         <p>진단과 약물치료를 받을 수 있어요. 증상이 심하거나 잠, 식사, 일상이 무너지고 있다면 먼저 찾아가 보세요.</p>
         <p class="muted small-text">"언제부터 어떤 일이 힘든지" 메모 한 줄이면 충분해요.</p>
+        <button class="btn ghost small" data-go="reach" type="button">진료 메모 만들기</button>
       </article>
       <article class="card">
         <h2 class="guide-h2">정신건강복지센터</h2>
@@ -288,12 +618,12 @@ function help() {
         <h2 class="guide-h2">심리상담 바우처</h2>
         <p>정부가 심리상담 비용을 지원하는 사업이에요. 2026년 기준 1:1 대면 상담 8회를 120일 안에 이용할 수 있고, 소득에 따라 본인 부담금이 달라요. 복지로나 주소지 행정복지센터에서 신청해요.</p>
         <p>정신건강복지센터나 대학교 상담센터 등의 의뢰서, 정신건강의학과 진단서나 소견서, 또는 국가건강검진 우울 선별검사 결과 등이 필요해요. 사설 상담센터의 의뢰서는 인정되지 않아요.</p>
-        <p class="muted small-text">신청은 1년에 1번이고, 예산이 소진되면 일찍 마감될 수 있어요. 내 지역 상황은 보건복지상담센터 129에 먼저 물어보세요. 급한 자살 위기에는 진료가 먼저예요.</p>
+        <p class="muted small-text">신청은 1년에 1번이고, 예산이 소진되면 일찍 마감될 수 있어요. 해가 바뀌면 기준이 달라질 수 있으니 보건복지상담센터 129에 먼저 물어보세요. 급한 자살 위기에는 진료가 먼저예요.</p>
         ${source("voucher", "voucherLocal", "voucherSeoul")}
       </article>
       <article class="card">
         <h2 class="guide-h2">청소년이라면</h2>
-        <p>1388로 전화 상담을 받을 수 있어요. 믿을 수 있는 보호자나 선생님, 학교 상담 선생님에게 말하는 것도 좋은 시작이에요.</p>
+        <p>9~24세라면 1388에서 24시간 무료로 상담받을 수 있어요. 휴대폰으로 걸 때는 지역번호를 붙이고(예: 02-1388), 문자는 1388로 보내면 돼요. 믿을 수 있는 보호자나 선생님, 학교 상담 선생님에게 말하는 것도 좋은 시작이에요.</p>
       </article>
     </section>
 
@@ -357,6 +687,12 @@ function allies() {
       <p><strong>자살이 걱정된다면 혼자 판단하지 말고 함께 도움을 요청해 주세요.</strong> 곁에 있어 주거나 다른 사람에게 함께 살펴봐 달라고 부탁해 주세요.</p>
       ${crisisLines}
     </section>
+
+    <section class="card guide-section">
+      <h2 class="guide-h2">이곳을 알려 주고 싶다면</h2>
+      <p>가입도 설치도 필요 없어서 링크만 보내면 바로 열려요. 쓴 글은 그 사람의 기기에만 남고, 당신도 볼 수 없어요.</p>
+      <button class="btn secondary" data-share type="button">링크 보내기</button>
+    </section>
   `;
 }
 
@@ -370,9 +706,11 @@ function about() {
     <section class="card guide-section">
       <h2 class="guide-h2">이 사이트가 지키는 약속</h2>
       ${list([
+        "가입과 광고가 없고, 무료예요.",
         "지금 그대로의 당신을 평가하지 않아요. 연속 기록이나 남과의 비교로 재촉하지 않아요.",
         "내 기록은 내 기기에만 저장돼요. 서버로 보내지 않아요.",
-        "진단하거나 치료를 대신하지 않고, 도움받을 곳을 언제나 보여 줘요."
+        "진단하거나 치료를 대신하지 않고, 도움받을 곳을 언제나 보여 줘요.",
+        "글을 저장할 때 '죽고 싶다' 같은 말이 있으면 도움받을 곳을 살며시 보여 줘요. 이 확인은 내 기기 안에서만 일어나고, 누구에게도 알려지지 않아요."
       ])}
     </section>
 
@@ -429,6 +767,8 @@ function explore() {
         ["understand", "◐", "마음 알아보기", "우울, 불안과 공황, 공허감"],
         ["care", "✚", "어떤 치료가 있나요", "심리치료와 약물치료"],
         ["help", "☎", "도움받는 법", "어디에 어떻게 연락할까요"],
+        ["safety", "☂", "내 안전 계획", "힘든 순간을 위해 미리 적어 두기"],
+        ["reach", "❝", "말 꺼내는 법", "첫마디와 진료 메모"],
         ["allies", "♥", "곁에 있는 사람에게", "어떤 말이 힘이 될까요"]
       ].map(hubCard).join("")}
     </div>
@@ -445,7 +785,10 @@ function explore() {
     </div>
 
     <div class="guide-section">
-      <button class="btn ghost" data-go="about" type="button">이 사이트에 대해</button>
+      <div class="button-row">
+        <button class="btn ghost" data-go="about" type="button">이 사이트에 대해</button>
+        <button class="btn ghost" data-share type="button">이곳 알려 주기</button>
+      </div>
     </div>
   `;
 }
@@ -457,7 +800,7 @@ const moods = [
     tone: "heavy",
     label: "매우 힘들어요",
     say: "말해 줘서 고마워요. 지금은 아무것도 하지 않아도 돼요.",
-    actions: [["calm", "잠시 여기 있기", ""], ["help", "도움받을 곳 보기", "secondary"]]
+    actions: [["calm", "잠시 여기 있기", ""], ["help", "도움받을 곳 보기", "secondary"], ["reach", "누군가에게 말 꺼내 보기", "secondary"]]
   },
   {
     id: "hard",
@@ -653,11 +996,20 @@ function homeSections() {
       ].map(artCard).join("")}
     </section>
 
+    <section class="card alone-card reveal">
+      <h2 class="guide-h2">혼자 앓고 있다면</h2>
+      <p>말을 꺼내는 일이 가장 어려울 수 있어요. 전화가 어려우면 문자로, 아는 사람이 어려우면 모르는 상담자에게 시작해도 돼요.</p>
+      <div class="button-row">
+        <button class="btn secondary" data-go="reach" type="button">말 꺼내는 법</button>
+        <button class="btn ghost" data-go="safety" type="button">내 안전 계획</button>
+      </div>
+    </section>
+
     <section class="help-bar reveal">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-9"></path><path d="M12 13C12 8 8 6 3.5 6c0 5 3.5 7 8.5 7z"></path><path d="M12 11c0-4 3-6 8.5-6 0 5-3.5 6-8.5 6z"></path></svg>
       <div class="help-bar-text">
         <strong>당신은 혼자가 아니에요</strong>
-        <span>24시간 자살예방 상담전화 <a href="tel:109">109</a></span>
+        <span>24시간 자살예방 상담 <a class="tel-link" href="tel:109">전화 109</a> <a class="tel-link" href="sms:109">문자</a></span>
       </div>
       <button class="btn secondary help-bar-button" data-go="help" type="button">도움이 필요해요</button>
     </section>
@@ -671,6 +1023,14 @@ window.MindLabGuide = {
   heroScene,
   homeSections,
   calm,
+  calmReply,
+  crisisLines,
+  safety,
+  safetyText,
+  reach,
+  clinicText,
+  supportCard,
+  keepSafe,
   understand,
   care,
   help,

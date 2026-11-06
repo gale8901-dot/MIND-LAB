@@ -1,4 +1,7 @@
-const CACHE = "mind-lab-v8-shell";
+const CACHE = "mind-lab-v11-shell";
+
+// 인터넷이 느려도 위기 안내가 늦게 뜨지 않도록, 이 시간이 지나면 저장본을 먼저 보여 준다.
+const NETWORK_WAIT_MS = 3000;
 
 const CORE = [
   "./",
@@ -44,10 +47,36 @@ self.addEventListener("fetch", event => {
 
   if (url.origin !== location.origin) return;
 
-  // 인터넷이 되면 항상 최신 파일을 쓰고, 안 되면 저장해 둔 파일로 실행한다.
-  event.respondWith(
+  // 인터넷이 되면 최신 파일을 쓰고, 안 되거나 너무 느리면 저장해 둔 파일로 실행한다.
+  event.respondWith(new Promise(resolve => {
+    let settled = false;
+
+    const finish = response => {
+      if (settled) return;
+      settled = true;
+      resolve(response);
+    };
+
+    const fallback = async () => {
+      const cached = await caches.match(event.request);
+
+      if (cached) return cached;
+
+      return event.request.mode === "navigate"
+        ? (await caches.match("./index.html")) || Response.error()
+        : Response.error();
+    };
+
+    const wait = setTimeout(async () => {
+      const cached = await caches.match(event.request);
+
+      if (cached) finish(cached);
+    }, NETWORK_WAIT_MS);
+
     fetch(event.request)
       .then(response => {
+        clearTimeout(wait);
+
         if (response.ok) {
           const copy = response.clone();
 
@@ -56,16 +85,11 @@ self.addEventListener("fetch", event => {
           );
         }
 
-        return response;
+        finish(response);
       })
-      .catch(() =>
-        caches.match(event.request).then(cached => {
-          if (cached) return cached;
-
-          return event.request.mode === "navigate"
-            ? caches.match("./index.html")
-            : Response.error();
-        })
-      )
-  );
+      .catch(async () => {
+        clearTimeout(wait);
+        finish(await fallback());
+      });
+  }));
 });

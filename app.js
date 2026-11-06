@@ -45,9 +45,44 @@ const defaultData = () => ({
   selfAnswers: {},
   careerAnswers: {},
   futureLetters: [],
+  safetyPlan: {},
+  clinicNote: {},
+  lastBackupAt: "",
+  backupNudgeAt: "",
+  installNudgeAt: "",
   createdAt: new Date().toISOString()
 });
 
+// 고칠 수 있는 기록의 종류와 저장 위치, 고치는 화면
+const EDIT_LISTS = {
+  emotion: "emotions",
+  thought: "thoughts",
+  journal: "journals",
+  goal: "goals",
+  future: "futureLetters"
+};
+
+const EDIT_PAGES = {
+  emotion: "emotion",
+  thought: "thought",
+  journal: "journal",
+  goal: "action",
+  future: "future"
+};
+
+// 주소 끝에 #calm처럼 붙여 바로 열 수 있는 화면
+const LINKABLE_PAGES = [
+  "calm", "help", "safety", "reach", "understand", "care", "allies",
+  "about", "record", "explore", "journal", "emotion", "settings"
+];
+
+let installEvent = null;
+
+const LOCK_KEY = "fyw3_lock";
+const HEAVY_WORDS = /죽고\s*싶|자살|자해|사라지고\s*싶|끝내고\s*싶|살기\s*싫|살고\s*싶지\s*않/;
+
+let supportPending = false;
+let persistAsked = false;
 let saveBlocked = false;
 let recoveredOnStart = false;
 
@@ -121,6 +156,11 @@ function normalizeData(x) {
       .filter(v => typeof v === "string"),
     selfAnswers: normalizeAnswers(x.selfAnswers, String),
     careerAnswers: normalizeAnswers(x.careerAnswers, Number),
+    safetyPlan: normalizeAnswers(x.safetyPlan, String),
+    clinicNote: normalizeAnswers(x.clinicNote, String),
+    lastBackupAt: typeof x.lastBackupAt === "string" ? x.lastBackupAt : "",
+    backupNudgeAt: typeof x.backupNudgeAt === "string" ? x.backupNudgeAt : "",
+    installNudgeAt: typeof x.installNudgeAt === "string" ? x.installNudgeAt : "",
     createdAt: typeof x.createdAt === "string" ? x.createdAt : base.createdAt
   };
 }
@@ -181,11 +221,20 @@ function save() {
 
   try {
     localStorage.setItem(KEY, JSON.stringify(data));
+    askPersistentStorage();
     return true;
   } catch (e) {
     toast("저장 공간이 부족하거나 브라우저 저장이 차단되었습니다.");
     return false;
   }
+}
+
+// 브라우저가 공간이 부족할 때 기록을 먼저 지우지 않도록 요청한다.
+function askPersistentStorage() {
+  if (persistAsked) return;
+
+  persistAsked = true;
+  navigator.storage?.persist?.().catch(() => {});
 }
 
 function toast(msg) {
@@ -213,11 +262,8 @@ function withinDays(d, n) {
 function crisisNotice() {
   return `
     <div class="notice crisis-notice">
-      <strong>지금 많이 힘들다면 혼자 견디지 않아도 괜찮아요.</strong><br>
-      자살예방 상담전화 <a href="tel:109">109</a> (24시간) ·
-      정신건강 위기상담 <a href="tel:15770199">1577-0199</a> ·
-      청소년전화 <a href="tel:1388">1388</a><br>
-      당장 위험하다면 112 또는 119에 연락하세요.
+      <strong>지금 많이 힘들다면 혼자 견디지 않아도 괜찮아요.</strong>
+      ${window.MindLabGuide.crisisLines}
       이 앱은 상담이나 치료를 대신하지 않아요.
     </div>
   `;
@@ -230,6 +276,8 @@ function header() {
     understand: "마음 알아보기",
     care: "어떤 치료가 있나요",
     help: "도움받는 법",
+    safety: "내 안전 계획",
+    reach: "말 꺼내는 법",
     allies: "곁에 있는 사람에게",
     about: "이 사이트에 대해",
     record: "기록",
@@ -249,6 +297,10 @@ function header() {
 
   $("#pageName").textContent = names[page] || "홈";
 
+  document.title = page === "home"
+    ? "MIND LAB | 혼자 힘들 때 곁이 되어 주는 곳"
+    : `${names[page] || "홈"} | MIND LAB`;
+
   $("#todayLabel").textContent =
     new Date().toLocaleDateString("ko-KR", {
       month: "long",
@@ -257,13 +309,29 @@ function header() {
     });
 
   $$(".nav-item[data-page]").forEach(b => {
-    b.classList.toggle("active", b.dataset.page === page);
+    const current = b.dataset.page === page;
+
+    b.classList.toggle("active", current);
+
+    if (current) {
+      b.setAttribute("aria-current", "page");
+    } else {
+      b.removeAttribute("aria-current");
+    }
   });
 
   const group = PAGE_GROUPS[page] || page;
 
   $$(".bottom-item").forEach(b => {
-    b.classList.toggle("active", b.dataset.group === group);
+    const current = b.dataset.group === group;
+
+    b.classList.toggle("active", current);
+
+    if (current) {
+      b.setAttribute("aria-current", "page");
+    } else {
+      b.removeAttribute("aria-current");
+    }
   });
 
   document.body.classList.toggle("dawn", !!data.profile.dawn);
@@ -279,6 +347,8 @@ const PAGE_GROUPS = {
   understand: "explore",
   care: "explore",
   help: "explore",
+  safety: "explore",
+  reach: "explore",
   allies: "explore",
   about: "explore",
   know: "explore",
@@ -294,6 +364,10 @@ const GROUP_NAMES = {
 };
 
 function go(p, options = {}) {
+  // 쓰던 글을 먼저 저장한 뒤에 화면을 옮긴다.
+  flushPendingDraft();
+  supportPending = false;
+
   // 이동 기록을 남겨 휴대폰과 브라우저의 뒤로 가기가 사이트 안에서 작동하게 한다.
   if (p !== page) {
     navDepth++;
@@ -377,7 +451,7 @@ function entries(items, kind, emptyMessage) {
             </div>
 
             <div class="entry-actions">
-              ${source === "journal" ? `
+              ${["journal", "emotion", "thought"].includes(source) ? `
                 <button class="btn ghost small"
                   data-edit="${source}"
                   data-id="${esc(x.id)}">수정</button>
@@ -621,14 +695,17 @@ const EMOTION_COLORS = {
   "외로움": "#8d8fc4",
   "답답함": "#9aa7b8",
   "피곤함": "#b3a7c9",
-  "혼란": "#7fc0cf"
+  "혼란": "#7fc0cf",
+  "공허함": "#8f96ad",
+  "무기력": "#a39a8f"
 };
 
 function emotionPage() {
   const moods = [
-    "기쁨", "평온", "감사", "설렘",
-    "자신감", "슬픔", "불안", "분노",
-    "외로움", "답답함", "피곤함", "혼란"
+    "슬픔", "불안", "외로움", "공허함",
+    "무기력", "분노", "답답함", "피곤함",
+    "혼란", "평온", "감사", "기쁨",
+    "설렘", "자신감"
   ];
 
   return `
@@ -646,12 +723,12 @@ function emotionPage() {
           <div class="field">
             <span class="field-title" id="moodLabel">지금 느끼는 감정</span>
             <div class="orb-list" role="group" aria-labelledby="moodLabel">
-              ${moods.map((m, i) => `
+              ${moods.map(m => `
                 <button
                   type="button"
                   class="orb-button"
                   data-orb="${m}"
-                  aria-pressed="${i === 0}"
+                  aria-pressed="false"
                   style="--orb:${EMOTION_COLORS[m]}"
                 >
                   <span class="orb" aria-hidden="true"></span>
@@ -659,7 +736,8 @@ function emotionPage() {
                 </button>
               `).join("")}
             </div>
-            <select id="mood" required hidden aria-hidden="true" tabindex="-1">
+            <select id="mood" hidden aria-hidden="true" tabindex="-1">
+              <option value=""></option>
               ${moods.map(m => `<option>${m}</option>`).join("")}
             </select>
           </div>
@@ -924,9 +1002,9 @@ function careerPage() {
       <form id="careerForm">
         ${careerItems.map((q, i) => `
           <div class="field">
-            <label>${i + 1}. ${q[1]}</label>
+            <span class="field-title" id="careerQ${i}">${i + 1}. ${q[1]}</span>
 
-            <div class="chip-list">
+            <div class="chip-list" role="radiogroup" aria-labelledby="careerQ${i}">
               ${[1, 2, 3, 4, 5].map(n => `
                 <label class="chip ${Number(data.careerAnswers[i]) === n ? "selected" : ""}">
                   <input
@@ -947,7 +1025,7 @@ function careerPage() {
         `).join("")}
 
         <button class="btn" type="submit">
-          결과 분석하기 (${done}/18 응답)
+          결과 분석하기 (<span id="careerCount">${done}</span>/18 응답)
         </button>
       </form>
     </section>
@@ -1093,6 +1171,12 @@ function actionPage() {
 
                   <div class="entry-actions">
                     <button
+                      class="btn ghost small"
+                      data-edit="goal"
+                      data-id="${esc(g.id)}"
+                    >수정</button>
+
+                    <button
                       class="btn danger small"
                       data-delete="goal"
                       data-id="${esc(g.id)}"
@@ -1121,22 +1205,23 @@ function actionPage() {
 const journalCategories = ["일상", "감정", "관계", "공부·일", "성장", "기타"];
 
 function journalPage() {
-  const draft = readDrafts().journal || null;
+  const drafts = readDrafts();
 
   // 수정하던 글의 임시 저장본이 있으면 수정 상태를 이어간다.
-  if (!activeEdit && draft?.editId) {
-    const item = data.journals.find(x => x.id === draft.editId);
+  if (!activeEdit && drafts.journalEdit?.editId) {
+    const item = data.journals.find(x => x.id === drafts.journalEdit.editId);
 
     if (item) {
       activeEdit = { kind: "journal", item };
     }
   }
 
-  const useDraft = !!draft && (
-    activeEdit
-      ? draft.editId === activeEdit.item.id
-      : !draft.editId
-  );
+  // 새 글과 수정 중인 글의 임시 저장본은 서로 덮어쓰지 않도록 따로 둔다.
+  const draft = activeEdit
+    ? (drafts.journalEdit?.editId === activeEdit.item.id ? drafts.journalEdit : null)
+    : (drafts.journal || null);
+
+  const useDraft = !!draft;
 
   const form = useDraft ? draft : (activeEdit?.item || {});
 
@@ -1561,7 +1646,7 @@ function showIntroOnce() {
       <small>A PLACE TO BE YOURSELF</small>
     </div>
     <p class="intro-line">오늘도 많이 힘들었죠.<br>여기서는 괜찮은 척하지<br>않아도 돼요.</p>
-    <p class="intro-sub">당신의 마음이 잠시 쉴 수 있도록.</p>
+    <p class="intro-sub">당신의 마음이 잠시 쉴 수 있도록.<br>가입도 설치도 필요 없어요. 쓴 글은 내 기기에만 남아요.</p>
     <button class="intro-start" id="introStart" type="button">시작하기 <span aria-hidden="true">→</span></button>
     <button class="intro-help" id="introHelp" type="button">지금 많이 힘들어요</button>
   `;
@@ -1597,6 +1682,14 @@ function isLetterLocked(x) {
 }
 
 function futurePage() {
+  const letterDraft = activeEdit?.kind === "future"
+    ? (readDrafts().futureEdit || { target: activeEdit.item.to || "future" })
+    : readDrafts().future;
+
+  if (letterDraft?.target && LETTER_TARGETS[letterDraft.target]) {
+    letterTarget = letterDraft.target;
+  }
+
   // 날짜가 된 편지는 이 화면을 열면 읽은 것으로 표시한다.
   const newlyOpened = data.futureLetters.filter(
     x => isDatedLetter(x) && !isLetterLocked(x) && !x.read
@@ -1645,7 +1738,7 @@ function futurePage() {
         ${letterTarget === "future" ? `
           <div class="field">
             <label for="futureDate">다시 읽어볼 날짜</label>
-            <input type="date" id="futureDate">
+            <input type="date" id="futureDate" min="${today()}">
           </div>
         ` : ""}
 
@@ -1688,7 +1781,13 @@ function futurePage() {
                         class="btn ghost small"
                         data-open-letter="${esc(x.id)}"
                       >미리 열기</button>
-                    ` : ""}
+                    ` : `
+                      <button
+                        class="btn ghost small"
+                        data-edit="future"
+                        data-id="${esc(x.id)}"
+                      >수정</button>
+                    `}
 
                     <button
                       class="btn danger small"
@@ -1788,6 +1887,10 @@ function settingsPage() {
 
     ${crisisNotice()}
 
+    ${window.MindLabGuide.keepSafe()}
+
+    ${lockCard()}
+
     ${recoveryKeys().length ? `
       <div class="notice">
         <strong>보관된 이전 기록이 있어요.</strong><br>
@@ -1810,6 +1913,9 @@ function settingsPage() {
         백업 파일은 JSON 형식입니다.
         다른 기기에서 복원하려면 백업 파일을 옮겨 가져오세요.
         복원 전 현재 데이터도 자동으로 백업 파일로 내려받습니다.
+        ${data.lastBackupAt
+          ? `마지막 백업: ${esc(data.lastBackupAt.slice(0, 10))}.`
+          : "아직 백업한 적이 없어요."}
       </p>
 
       <div class="button-row">
@@ -1838,9 +1944,224 @@ function settingsPage() {
     </div>
 
     <div class="small-text muted">
-      MIND LAB 앱 버전 3.1 · 로컬 우선 구조 · 심리 진단 및 치료 목적이 아닌 자기성찰 도구
+      MIND LAB 앱 버전 4.0 · 로컬 우선 구조 · 심리 진단 및 치료 목적이 아닌 자기성찰 도구
     </div>
   `;
+}
+
+/* =========================
+   LOCK
+========================= */
+
+// 잠금은 다른 사람이 화면을 여는 것을 막을 뿐, 저장된 기록을 암호화하지는 않는다.
+function readLock() {
+  try {
+    const lock = JSON.parse(localStorage.getItem(LOCK_KEY) || "null");
+
+    return lock?.salt && lock?.hash ? lock : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function hashPin(pin, salt) {
+  const bytes = new TextEncoder().encode(`${salt}:${pin}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+
+  return [...new Uint8Array(digest)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function lockCard() {
+  if (!window.crypto?.subtle) return "";
+
+  const on = !!readLock();
+
+  return `
+    <section class="card guide-section">
+      <h2 class="guide-h2">앱 잠금 (선택)</h2>
+      <p class="muted small-text">
+        휴대폰을 함께 쓰는 사람이 기록을 바로 보지 못하게 막아 줘요. 기록을 암호화하는 기능은 아니에요.
+        <strong>숫자를 잊으면 기록을 지워야만 다시 들어올 수 있어요.</strong> 잠금 화면에서도 위기 연락처는 늘 보여요.
+      </p>
+      ${on ? `
+        <div class="button-row">
+          <button class="btn secondary" id="lockNow" type="button">지금 잠그기</button>
+          <button class="btn ghost" id="lockOff" type="button">잠금 끄기</button>
+        </div>
+      ` : `
+        <div class="pin-row">
+          <div class="field">
+            <label for="pinOne">숫자 4~8자리</label>
+            <input id="pinOne" type="password" inputmode="numeric" autocomplete="off" maxlength="8">
+          </div>
+          <div class="field">
+            <label for="pinTwo">한 번 더</label>
+            <input id="pinTwo" type="password" inputmode="numeric" autocomplete="off" maxlength="8">
+          </div>
+        </div>
+        <button class="btn secondary" id="lockOn" type="button">잠금 켜기</button>
+      `}
+    </section>
+  `;
+}
+
+function showLock() {
+  if ($(".lock-screen") || !readLock()) return;
+
+  const screen = document.createElement("section");
+
+  screen.className = "intro lock-screen";
+  screen.setAttribute("aria-label", "MIND LAB 잠금 화면");
+  screen.innerHTML = `
+    <div class="intro-name"><strong>MIND LAB</strong></div>
+    <form id="unlockForm">
+      <label for="unlockPin">숫자를 입력해 주세요</label>
+      <input id="unlockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8">
+      <button class="btn" type="submit">열기</button>
+    </form>
+    <section class="crisis-card">
+      <p><strong>잠금을 풀지 않아도 연락할 수 있어요.</strong></p>
+      ${window.MindLabGuide.crisisLines}
+    </section>
+    <button class="intro-help" id="forgotPin" type="button">숫자를 잊었어요</button>
+  `;
+
+  document.body.append(screen);
+  document.body.classList.add("intro-open");
+
+  $("#unlockForm").addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const lock = readLock();
+
+    if (!lock || await hashPin($("#unlockPin").value, lock.salt) === lock.hash) {
+      screen.remove();
+      document.body.classList.remove("intro-open");
+    } else {
+      $("#unlockPin").value = "";
+      toast("숫자가 맞지 않아요.");
+    }
+  });
+
+  $("#forgotPin").addEventListener("click", () => {
+    if (
+      confirm("숫자를 잊었다면 모든 기록을 지워야 잠금을 풀 수 있어요. 지울까요?") &&
+      confirm("정말 지울까요? 지운 기록은 되돌릴 수 없어요.")
+    ) {
+      wipeAll();
+      location.reload();
+    }
+  });
+
+  $("#unlockPin").focus({ preventScroll: true });
+}
+
+function wipeAll() {
+  cancelPendingDraft();
+
+  try {
+    localStorage.removeItem(KEY);
+    localStorage.removeItem(DRAFT);
+    localStorage.removeItem(LOCK_KEY);
+    recoveryKeys().forEach(k => localStorage.removeItem(k));
+  } catch (e) {
+    console.warn(e);
+  }
+
+  saveBlocked = false;
+  data = defaultData();
+}
+
+// 재촉하지 않도록 기록을 모아 두는 화면에서만, 나중에를 누르면 2주 동안 보여 주지 않는다.
+function backupNudge() {
+  const total = data.journals.length + data.emotions.length +
+    data.thoughts.length + data.futureLetters.length;
+  const age = iso => iso ? Date.now() - new Date(iso).getTime() : Infinity;
+
+  if (!total || age(data.lastBackupAt) < 30 * 86400000 || age(data.backupNudgeAt) < 14 * 86400000) {
+    return "";
+  }
+
+  return `
+    <div class="notice" id="backupNudge">
+      기록은 이 기기에만 있어요. 잃어버리지 않도록 가끔 백업해 두면 좋아요.
+      <div class="button-row">
+        <button class="btn secondary small" data-go="settings" type="button">백업하러 가기</button>
+        <button class="btn ghost small" id="nudgeLater" type="button">나중에</button>
+      </div>
+    </div>
+  `;
+}
+
+function isInstalled() {
+  return !!window.matchMedia?.("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+}
+
+// 첫 방문에는 묻지 않고, 기록을 남긴 뒤에 한 번만 조용히 알려 준다.
+function installNudge() {
+  const total = data.journals.length + data.emotions.length +
+    data.thoughts.length + data.futureLetters.length;
+
+  if (!total || isInstalled() || data.installNudgeAt) return "";
+
+  return `
+    <div class="notice" id="installNudge">
+      다시 찾아오기 쉽게 홈 화면에 추가해 둘 수 있어요. 기록도 더 안전하게 남아요.
+      <div class="button-row">
+        <button class="btn secondary small" data-go="settings" type="button">방법 보기</button>
+        <button class="btn ghost small" id="installLater" type="button">괜찮아요</button>
+      </div>
+    </div>
+  `;
+}
+
+async function shareApp() {
+  const url = `${location.origin}${location.pathname}`;
+  const text = "힘들 때 열어 볼 수 있는 곳이 있어. 가입도 설치도 필요 없어.";
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "MIND LAB", text, url });
+    } catch (e) {
+      if (e.name !== "AbortError") copyText(`${text}\n${url}`, "링크를 복사했어요.");
+    }
+  } else {
+    copyText(`${text}\n${url}`, "링크를 복사했어요.");
+  }
+}
+
+function copyText(text, message) {
+  const done = () => toast(message);
+
+  const fallback = () => {
+    const area = document.createElement("textarea");
+
+    area.value = text;
+    document.body.append(area);
+    area.select();
+
+    try {
+      document.execCommand("copy");
+      done();
+    } catch (e) {
+      toast("복사하지 못했어요. 글을 길게 눌러 복사해 주세요.");
+    }
+
+    area.remove();
+  };
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(done, fallback);
+  } else {
+    fallback();
+  }
+}
+
+function noteHeavyWords(...texts) {
+  supportPending = HEAVY_WORDS.test(texts.join(" "));
 }
 
 function guideText() {
@@ -1868,19 +2189,23 @@ function guideText() {
 ========================= */
 
 function render() {
+  flushPendingDraft();
+  resumeEditDraft();
   header();
 
   const guide = window.MindLabGuide;
 
   const views = {
     home,
-    calm: guide.calm,
+    calm: () => guide.calm(data),
     understand: guide.understand,
     care: guide.care,
     help: guide.help,
+    safety: () => guide.safety(data),
+    reach: () => guide.reach(data),
     allies: guide.allies,
     about: guide.about,
-    record: guide.record,
+    record: () => (installNudge() || backupNudge()) + guide.record(),
     explore: guide.explore,
     know: knowPage,
     self: selfPage,
@@ -1909,18 +2234,32 @@ function render() {
       </nav>
     `;
 
-  app.innerHTML = pageNav + (views[page] || home)();
+  app.innerHTML =
+    pageNav +
+    (supportPending ? guide.supportCard() : "") +
+    (views[page] || home)();
 
   // 저장할 때는 움직이지 않고, 다른 화면으로 옮겨 갈 때만 부드럽게 전환한다.
   if (page !== renderedPage) {
     app.classList.remove("page-in");
     void app.offsetWidth;
     app.classList.add("page-in");
+
+    // 첫 화면이 아니라면 키보드와 스크린리더의 위치도 새 화면으로 옮긴다.
+    if (renderedPage !== null) {
+      app.focus({ preventScroll: true });
+    }
+
     renderedPage = page;
   }
 
   bindPage();
   revealOnScroll();
+
+  if (supportPending) {
+    window.scrollTo(0, 0);
+    $("#supportCard")?.focus({ preventScroll: true });
+  }
 }
 
 let renderedPage = null;
@@ -1989,6 +2328,39 @@ function bindPage() {
 
   window.MindLabRest?.bind();
 
+  restoreFormDrafts();
+
+  Object.keys(FORM_DRAFTS).forEach(formId => {
+    on(`#${formId}`, "input", () => {
+      debouncedSave("#none", () => saveFormDraft(formId));
+    });
+  });
+
+  showEditMode(on);
+
+  on("#installLater", "click", () => {
+    data.installNudgeAt = new Date().toISOString();
+    save();
+    $("#installNudge")?.remove();
+  });
+
+  if (installEvent) {
+    $("#installApp")?.classList.remove("hidden");
+  }
+
+  on("#installApp", "click", async () => {
+    if (!installEvent) return;
+
+    installEvent.prompt();
+    await installEvent.userChoice.catch(() => {});
+    installEvent = null;
+    $("#installApp")?.classList.add("hidden");
+  });
+
+  $$("[data-share]").forEach(b => {
+    b.addEventListener("click", shareApp);
+  });
+
   $$("[data-orb]").forEach(b => {
     b.addEventListener("click", () => {
       $("#mood").value = b.dataset.orb;
@@ -1996,8 +2368,120 @@ function bindPage() {
       $$("[data-orb]").forEach(other => {
         other.setAttribute("aria-pressed", String(other === b));
       });
+
+      debouncedSave("#none", () => saveFormDraft("emotionForm"));
     });
   });
+
+  // 지금 힘들어요: 고른 상태에 맞는 안내만 보여 준다. 고른 내용은 저장하지 않는다.
+  $$("[data-calm]").forEach(b => {
+    b.addEventListener("click", () => {
+      const nextId = b.getAttribute("aria-pressed") === "true" ? "" : b.dataset.calm;
+      const reply = $("#calmReply");
+      const hasPlan = Object.values(data.safetyPlan).some(x => String(x).trim());
+
+      $$("[data-calm]").forEach(other => {
+        other.setAttribute("aria-pressed", String(other.dataset.calm === nextId));
+      });
+
+      reply.innerHTML = window.MindLabGuide.calmReply(nextId, hasPlan);
+
+      $$("[data-go]", reply).forEach(x => {
+        x.addEventListener("click", () => go(x.dataset.go));
+      });
+
+      $$("[data-scroll]", reply).forEach(x => {
+        x.addEventListener("click", () => {
+          $(`#${x.dataset.scroll}`)?.scrollIntoView({ block: "start" });
+          $("#restToggle")?.focus({ preventScroll: true });
+        });
+      });
+    });
+  });
+
+  on("#supportClose", "click", () => {
+    supportPending = false;
+    $("#supportCard")?.remove();
+  });
+
+  on("#nudgeLater", "click", () => {
+    data.backupNudgeAt = new Date().toISOString();
+    save();
+    $("#backupNudge")?.remove();
+  });
+
+  on("#safetyForm", "input", e => {
+    if (e.target.name) {
+      data.safetyPlan[e.target.name] = e.target.value;
+      debouncedSave("#safetyStatus");
+    }
+  });
+
+  on("#safetyForm", "submit", e => {
+    e.preventDefault();
+    flushPendingDraft();
+    save();
+    render();
+    toast("안전 계획을 저장했어요.");
+    window.scrollTo(0, 0);
+  });
+
+  on("#copySafety", "click", () => {
+    copyText(window.MindLabGuide.safetyText(data.safetyPlan), "안전 계획을 복사했어요.");
+  });
+
+  on("#clinicForm", "input", e => {
+    if (e.target.name) {
+      data.clinicNote[e.target.name] = e.target.value;
+      $("#clinicPreview").textContent =
+        window.MindLabGuide.clinicText(data.clinicNote) || "적으면 여기에 한 장으로 모여요.";
+      debouncedSave("#clinicStatus");
+    }
+  });
+
+  on("#clinicForm", "submit", e => e.preventDefault());
+
+  on("#copyClinic", "click", () => {
+    const text = window.MindLabGuide.clinicText(data.clinicNote);
+
+    if (text) {
+      copyText(text, "메모를 복사했어요.");
+    } else {
+      toast("먼저 한 칸이라도 적어 주세요.");
+    }
+  });
+
+  $$("[data-copy-text]").forEach(b => {
+    b.addEventListener("click", () => copyText(b.dataset.copyText, "복사했어요. 그대로 붙여 넣으면 돼요."));
+  });
+
+  on("#lockOn", "click", async () => {
+    const one = $("#pinOne").value;
+
+    if (!/^\d{4,8}$/.test(one)) return toast("숫자 4~8자리로 정해 주세요.");
+    if (one !== $("#pinTwo").value) return toast("두 칸의 숫자가 달라요.");
+    if (!confirm("숫자를 잊으면 기록을 지워야만 다시 들어올 수 있어요. 잠금을 켤까요?")) return;
+
+    const salt = uid();
+
+    try {
+      localStorage.setItem(LOCK_KEY, JSON.stringify({ salt, hash: await hashPin(one, salt) }));
+      toast("잠금을 켰어요.");
+      render();
+    } catch (e) {
+      toast("잠금을 켜지 못했어요. 저장 공간을 확인해 주세요.");
+    }
+  });
+
+  on("#lockOff", "click", () => {
+    if (confirm("잠금을 끌까요?")) {
+      localStorage.removeItem(LOCK_KEY);
+      toast("잠금을 껐어요.");
+      render();
+    }
+  });
+
+  on("#lockNow", "click", showLock);
 
   $$("[data-know-tab]").forEach(b => {
     b.addEventListener("click", () => {
@@ -2009,10 +2493,17 @@ function bindPage() {
   $$("[data-letter-target]").forEach(b => {
     b.addEventListener("click", () => {
       const written = $("#futureBody").value;
+      const date = $("#futureDate")?.value;
 
+      cancelPendingDraft();
       letterTarget = b.dataset.letterTarget;
+      saveFormDraft("futureForm");
       render();
       $("#futureBody").value = written;
+
+      if (date && $("#futureDate")) {
+        $("#futureDate").value = date;
+      }
     });
   });
 
@@ -2092,42 +2583,49 @@ function bindPage() {
   on("#emotionForm", "submit", e => {
     e.preventDefault();
 
-    data.emotions.push({
-      id: uid(),
-      date: today(),
-      createdAt: new Date().toISOString(),
+    if (!$("#mood").value) {
+      return toast("지금 느끼는 감정을 하나 골라 주세요.");
+    }
+
+    cancelPendingDraft();
+    noteHeavyWords(
+      $("#emotionEvent").value,
+      $("#emotionThought").value,
+      $("#emotionNeed").value
+    );
+
+    saveRecord("emotionForm", {
       mood: $("#mood").value,
       intensity: Number($("#intensity").value),
       body: $("#emotionEvent").value,
       thought: $("#emotionThought").value,
       need: $("#emotionNeed").value
-    });
-
-    save();
-    toast("감정 기록을 저장했어요.");
-    render();
+    }, "감정 기록을 저장했어요.");
   });
 
   on("#thoughtForm", "submit", e => {
     e.preventDefault();
 
-    data.thoughts.push({
-      id: uid(),
-      date: today(),
-      createdAt: new Date().toISOString(),
-      situation: $("#situation").value,
-      body:
-        `떠오른 생각: ${$("#autoThought").value}\n` +
-        `감정: ${$("#thoughtEmotion").value}\n` +
-        `근거: ${$("#evidenceFor").value}\n` +
-        `다른 근거: ${$("#evidenceAgainst").value}\n` +
-        `균형 잡힌 관점: ${$("#balancedThought").value}\n` +
-        `다음 행동: ${$("#nextAction").value}`
-    });
+    cancelPendingDraft();
 
-    save();
-    toast("생각 기록을 저장했어요.");
-    render();
+    const thoughtBody = [
+      ["떠오른 생각", "#autoThought"],
+      ["감정", "#thoughtEmotion"],
+      ["근거", "#evidenceFor"],
+      ["다른 근거", "#evidenceAgainst"],
+      ["균형 잡힌 관점", "#balancedThought"],
+      ["다음 행동", "#nextAction"]
+    ]
+      .filter(([, sel]) => $(sel).value.trim())
+      .map(([label, sel]) => `${label}: ${$(sel).value}`)
+      .join("\n");
+
+    noteHeavyWords($("#situation").value, thoughtBody);
+
+    saveRecord("thoughtForm", {
+      situation: $("#situation").value,
+      body: thoughtBody
+    }, "생각 기록을 저장했어요.");
   });
 
   $$("#valueChips .chip").forEach(b => {
@@ -2167,6 +2665,11 @@ function bindPage() {
     $$(`input[name="${e.target.name}"]`).forEach(input => {
       input.closest(".chip")?.classList.toggle("selected", input.checked);
     });
+
+    // 끝까지 답하지 않아도 답한 만큼 저장해 두고, 나중에 이어서 답할 수 있게 한다.
+    data.careerAnswers[e.target.name.slice(1)] = Number(e.target.value);
+    $("#careerCount").textContent = Object.keys(data.careerAnswers).length;
+    debouncedSave("#none");
   });
 
   on("#careerForm", "submit", e => {
@@ -2196,18 +2699,13 @@ function bindPage() {
   on("#goalForm", "submit", e => {
     e.preventDefault();
 
-    data.goals.push({
-      id: uid(),
+    cancelPendingDraft();
+
+    saveRecord("goalForm", {
       name: $("#goalName").value,
       due: $("#goalDate").value,
-      note: $("#goalNote").value,
-      done: false,
-      createdAt: new Date().toISOString()
-    });
-
-    save();
-    toast("목표를 추가했어요.");
-    render();
+      note: $("#goalNote").value
+    }, "목표를 추가했어요.", { done: false });
   });
 
   on("#journalForm", "input", () => {
@@ -2236,6 +2734,9 @@ function bindPage() {
     };
 
     cancelPendingDraft();
+    noteHeavyWords(obj.title, obj.body);
+
+    const draftSlot = activeEdit?.kind === "journal" ? "journalEdit" : "journal";
 
     if (activeEdit?.kind === "journal") {
       data.journals = data.journals.map(x =>
@@ -2248,7 +2749,7 @@ function bindPage() {
     activeEdit = null;
 
     save();
-    clearDraft("journal");
+    clearDraft(draftSlot);
 
     toast("일기를 저장했어요.");
     render();
@@ -2257,7 +2758,7 @@ function bindPage() {
   on("#clearJournal", "click", () => {
     if (confirm("작성 중인 내용을 비울까요?")) {
       cancelPendingDraft();
-      clearDraft("journal");
+      clearDraft(activeEdit ? "journalEdit" : "journal");
       activeEdit = null;
       render();
     }
@@ -2271,18 +2772,16 @@ function bindPage() {
 
     const toFuture = letterTarget === "future";
 
-    data.futureLetters.push({
-      id: uid(),
+    cancelPendingDraft();
+    noteHeavyWords($("#futureBody").value);
+
+    saveRecord("futureForm", {
       to: letterTarget,
       date: toFuture ? ($("#futureDate").value || "날짜 미정") : today(),
       body: $("#futureBody").value,
       read: !toFuture,
-      createdAt: new Date().toISOString()
-    });
-
-    save();
-    toast(`${LETTER_TARGETS[letterTarget].title} 보내는 편지를 보관했어요.`);
-    render();
+      openedEarly: false
+    }, `${LETTER_TARGETS[letterTarget].title} 보내는 편지를 보관했어요.`);
   });
 
   on("#saveSettings", "click", () => {
@@ -2301,14 +2800,7 @@ function bindPage() {
 
   on("#deleteAll", "click", () => {
     if (confirm("모든 기록과 설정을 삭제할까요? 이 작업은 되돌릴 수 없습니다.")) {
-      cancelPendingDraft();
-
-      localStorage.removeItem(KEY);
-      localStorage.removeItem(DRAFT);
-      recoveryKeys().forEach(k => localStorage.removeItem(k));
-
-      saveBlocked = false;
-      data = defaultData();
+      wipeAll();
 
       toast("모든 데이터를 삭제했어요.");
       go("home");
@@ -2401,9 +2893,244 @@ function cancelPendingDraft() {
 function readDrafts() {
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT) || "{}");
-    return d && typeof d === "object" ? d : {};
+
+    if (!d || typeof d !== "object") return {};
+
+    // 예전 형식의 수정 중 임시 저장본을 새 자리로 옮긴다.
+    if (d.journal?.editId) {
+      d.journalEdit = d.journal;
+      delete d.journal;
+    }
+
+    return d;
   } catch {
     return {};
+  }
+}
+
+// 저장 전에 화면을 떠나도 글이 남도록 입력 칸을 임시 저장한다.
+const FORM_DRAFTS = {
+  emotionForm: {
+    key: "emotion",
+    page: "emotion",
+    ids: ["mood", "intensity", "emotionEvent", "emotionThought", "emotionNeed"],
+    text: ["emotionEvent", "emotionThought", "emotionNeed", "mood"]
+  },
+  thoughtForm: {
+    key: "thought",
+    page: "thought",
+    ids: ["situation", "autoThought", "thoughtEmotion", "evidenceFor", "evidenceAgainst", "balancedThought", "nextAction"]
+  },
+  futureForm: {
+    key: "future",
+    page: "future",
+    ids: ["futureDate", "futureBody"]
+  },
+  goalForm: {
+    key: "goal",
+    page: "action",
+    ids: ["goalName", "goalDate", "goalNote"]
+  }
+};
+
+// 지금 이 입력 칸으로 고치고 있는 기록. 없으면 새 기록을 쓰는 중이다.
+function editingOf(formId) {
+  return activeEdit?.kind === FORM_DRAFTS[formId].key ? activeEdit.item : null;
+}
+
+// 고치다가 화면을 떠났다면 돌아왔을 때 이어서 고칠 수 있게 한다.
+function resumeEditDraft() {
+  if (activeEdit) return;
+
+  const form = Object.values(FORM_DRAFTS).find(x => x.page === page);
+
+  if (!form) return;
+
+  const draft = readDrafts()[`${form.key}Edit`];
+
+  if (!draft?.editId) return;
+
+  const item = data[EDIT_LISTS[form.key]].find(x => x.id === draft.editId);
+
+  if (item) {
+    activeEdit = { kind: form.key, item };
+  } else {
+    clearDraft(`${form.key}Edit`);
+  }
+}
+
+// 저장된 생각 기록을 입력 칸별로 다시 나눈다.
+function thoughtValues(item) {
+  const labels = {
+    "떠오른 생각": "autoThought",
+    "감정": "thoughtEmotion",
+    "근거": "evidenceFor",
+    "다른 근거": "evidenceAgainst",
+    "균형 잡힌 관점": "balancedThought",
+    "다음 행동": "nextAction"
+  };
+  const values = { situation: item.situation || "" };
+  let current = null;
+
+  String(item.body || "").split("\n").forEach(line => {
+    const found = line.match(/^([^:]+): ?(.*)$/);
+
+    if (found && labels[found[1]]) {
+      current = labels[found[1]];
+      values[current] = found[2];
+    } else if (current) {
+      values[current] += `\n${line}`;
+    }
+  });
+
+  return values;
+}
+
+function editValues(formId, item) {
+  if (formId === "emotionForm") {
+    return {
+      mood: item.mood || "",
+      intensity: String(item.intensity || 5),
+      emotionEvent: item.body || "",
+      emotionThought: item.thought || "",
+      emotionNeed: item.need || ""
+    };
+  }
+
+  if (formId === "thoughtForm") return thoughtValues(item);
+
+  if (formId === "goalForm") {
+    return {
+      goalName: item.name || "",
+      goalDate: item.due || "",
+      goalNote: item.note || ""
+    };
+  }
+
+  return {
+    futureBody: item.body || "",
+    futureDate: isDatedLetter(item) ? item.date : ""
+  };
+}
+
+function showEditMode(on) {
+  const formId = Object.keys(FORM_DRAFTS).find(id => $(`#${id}`));
+
+  if (!formId || !editingOf(formId)) return;
+
+  const form = $(`#${formId}`);
+  const submit = $("[type=submit]", form);
+
+  submit.textContent = "수정 저장";
+  submit.insertAdjacentHTML(
+    "afterend",
+    `<button class="btn ghost" id="cancelEdit" type="button">수정 취소</button>`
+  );
+  form.insertAdjacentHTML(
+    "afterbegin",
+    `<div class="notice field full">이 기록을 고치고 있어요.</div>`
+  );
+
+  on("#cancelEdit", "click", () => {
+    cancelPendingDraft();
+    clearDraft(`${FORM_DRAFTS[formId].key}Edit`);
+    activeEdit = null;
+    render();
+  });
+}
+
+// 새 기록은 목록에 더하고, 고치는 중이면 원래 기록의 날짜와 번호를 그대로 둔다.
+function saveRecord(formId, fields, message, newOnly = {}) {
+  const { key } = FORM_DRAFTS[formId];
+  const listKey = EDIT_LISTS[key];
+  const editing = editingOf(formId);
+
+  cancelPendingDraft();
+
+  if (editing) {
+    data[listKey] = data[listKey].map(x =>
+      x.id === editing.id ? { ...x, ...fields } : x
+    );
+  } else {
+    data[listKey].push({
+      id: uid(),
+      date: today(),
+      createdAt: new Date().toISOString(),
+      ...newOnly,
+      ...fields
+    });
+  }
+
+  activeEdit = null;
+
+  save();
+  clearDraft(editing ? `${key}Edit` : key);
+  toast(editing ? "수정한 내용을 저장했어요." : message);
+  render();
+}
+
+function saveFormDraft(formId) {
+  const { key, ids, text } = FORM_DRAFTS[formId];
+
+  if (!$(`#${formId}`)) return true;
+
+  try {
+    const d = readDrafts();
+    const values = {};
+    const editing = editingOf(formId);
+
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+
+      if (el) values[id] = el.value;
+    });
+
+    const target = formId === "futureForm" ? letterTarget : undefined;
+
+    if (editing) {
+      d[`${key}Edit`] = { ...values, target, editId: editing.id };
+    } else if ((text || ids).some(id => String(values[id] || "").trim())) {
+      d[key] = { ...values, target };
+    } else {
+      delete d[key];
+    }
+
+    localStorage.setItem(DRAFT, JSON.stringify(d));
+    return true;
+  } catch (e) {
+    toast("임시 저장에 실패했습니다. 저장 공간을 확인해 주세요.");
+    return false;
+  }
+}
+
+function restoreFormDrafts() {
+  const drafts = readDrafts();
+
+  Object.entries(FORM_DRAFTS).forEach(([formId, { key, ids }]) => {
+    if (!$(`#${formId}`)) return;
+
+    const editing = editingOf(formId);
+    const draft = editing
+      ? (drafts[`${key}Edit`]?.editId === editing.id
+        ? drafts[`${key}Edit`]
+        : editValues(formId, editing))
+      : drafts[key];
+
+    if (!draft) return;
+
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+
+      if (el && typeof draft[id] === "string") el.value = draft[id];
+    });
+  });
+
+  if ($("#emotionForm")) {
+    $("#intensityOut").textContent = $("#intensity").value;
+
+    $$("[data-orb]").forEach(b => {
+      b.setAttribute("aria-pressed", String(b.dataset.orb === $("#mood").value));
+    });
   }
 }
 
@@ -2418,14 +3145,21 @@ function saveJournalDraft() {
   try {
     const d = readDrafts();
 
-    if (!title.value && !body.value && !activeEdit) {
+    if (activeEdit?.kind === "journal") {
+      d.journalEdit = {
+        title: title.value,
+        body: body.value,
+        category: category.value,
+        editId: activeEdit.item.id
+      };
+    } else if (!title.value && !body.value) {
       delete d.journal;
     } else {
       d.journal = {
         title: title.value,
         body: body.value,
         category: category.value,
-        editId: activeEdit?.kind === "journal" ? activeEdit.item.id : null
+        editId: null
       };
     }
 
@@ -2518,30 +3252,24 @@ function globalSearch() {
 ========================= */
 
 function editEntry(kind, id) {
-  if (kind === "journal") {
-    const item = data.journals.find(x => x.id === id);
+  const listKey = EDIT_LISTS[kind];
 
-    if (item) {
-      activeEdit = {
-        kind: "journal",
-        item
-      };
+  if (!listKey) return;
 
-      go("journal", { keepEdit: true });
-    }
+  // 쓰던 새 글을 수정 중인 글로 착각해 저장하지 않도록 먼저 저장한다.
+  flushPendingDraft();
+
+  const item = data[listKey].find(x => x.id === id);
+
+  if (item) {
+    activeEdit = { kind, item };
+    go(EDIT_PAGES[kind], { keepEdit: true });
+    window.scrollTo(0, 0);
   }
 }
 
 function deleteEntry(kind, id) {
-  const map = {
-    emotion: "emotions",
-    thought: "thoughts",
-    journal: "journals",
-    goal: "goals",
-    future: "futureLetters"
-  };
-
-  const key = map[kind];
+  const key = EDIT_LISTS[kind];
 
   if (!key) return;
 
@@ -2549,15 +3277,14 @@ function deleteEntry(kind, id) {
 
   data[key] = data[key].filter(x => x.id !== id);
 
-  if (kind === "journal") {
-    if (activeEdit?.item?.id === id) {
-      activeEdit = null;
-    }
+  if (activeEdit?.item?.id === id) {
+    cancelPendingDraft();
+    activeEdit = null;
+  }
 
-    if (readDrafts().journal?.editId === id) {
-      cancelPendingDraft();
-      clearDraft("journal");
-    }
+  if (readDrafts()[`${kind}Edit`]?.editId === id) {
+    cancelPendingDraft();
+    clearDraft(`${kind}Edit`);
   }
 
   save();
@@ -2570,6 +3297,9 @@ function deleteEntry(kind, id) {
 ========================= */
 
 function exportData() {
+  data.lastBackupAt = new Date().toISOString();
+  save();
+
   const payload = {
     ...data,
     exportedAt: new Date().toISOString(),
@@ -2644,10 +3374,14 @@ function importData(e) {
       }
 
       exportData();
+      cancelPendingDraft();
+
+      const previous = data;
 
       data = normalizeData(x);
 
       if (!save()) {
+        data = previous;
         throw Error("저장에 실패했습니다.");
       }
 
@@ -2685,23 +3419,53 @@ window.addEventListener("popstate", e => {
   navDepth = e.state?.depth || 0;
   activeEdit = null;
   globalQuery = "";
+  supportPending = false;
 
   render();
   window.scrollTo(0, 0);
 });
 
+// 주소 끝이 #calm이면 그 화면부터 연다. 공유 링크와 홈 화면 바로가기에 쓴다.
+const linkedPage = location.hash.slice(1);
+
+if (LINKABLE_PAGES.includes(linkedPage)) {
+  page = linkedPage;
+}
+
 try {
-  history.replaceState({ page, depth: 0 }, "");
+  // 새로고침해도 처음 화면으로 끌려가지 않도록 주소의 #은 지운다.
+  history.replaceState({ page, depth: 0 }, "", location.pathname + location.search);
 } catch (e) {
   console.warn(e);
 }
 
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  installEvent = e;
+  $("#installApp")?.classList.remove("hidden");
+});
+
 // 창을 닫는 순간에도 작성 중인 내용을 잃지 않게 한다.
 window.addEventListener("pagehide", flushPendingDraft);
+let hiddenAt = 0;
+
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     flushPendingDraft();
+    hiddenAt = Date.now();
+  } else if (hiddenAt && Date.now() - hiddenAt > 60000) {
+    // 잠금을 켠 사람이 1분 넘게 자리를 비우면 다시 잠근다.
+    showLock();
   }
+});
+
+// 글꼴을 기다리느라 위기 안내가 늦게 뜨지 않도록 화면을 먼저 그린 뒤에 불러온다.
+window.addEventListener("load", () => {
+  const fonts = document.createElement("link");
+
+  fonts.rel = "stylesheet";
+  fonts.href = "https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@400;500;700&display=swap";
+  document.head.append(fonts);
 });
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
@@ -2714,7 +3478,12 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 
 render();
 
-showIntroOnce();
+if (readLock()) {
+  showLock();
+} else if (page === "home") {
+  // 특정 화면으로 바로 들어온 사람에게는 시작 화면을 보여 주지 않는다.
+  showIntroOnce();
+}
 
 if (recoveredOnStart) {
   toast("읽을 수 없는 이전 기록을 따로 보관했어요. 설정에서 내려받을 수 있어요.");
